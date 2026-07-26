@@ -19,6 +19,9 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let uid = 0;
   let svgDefs = null;
+  let sharedCanvas = null;
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 50;
 
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
@@ -58,7 +61,20 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      // Move to end to maintain LRU order
+      const cachedVal = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, cachedVal);
+      return cachedVal;
+    }
+
+    // Reuse a single shared canvas element to prevent DOM overhead and garbage collection pressure
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    const canvas = sharedCanvas;
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
@@ -85,7 +101,17 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = canvas.toDataURL();
+
+    if (mapCache.size >= MAX_CACHE_SIZE) {
+      // LRU cache eviction of the oldest entry (first item in the Map keys)
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    mapCache.set(key, dataUrl);
+
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,11 +222,20 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
-    function refresh() {
+    let lastW = 0;
+    let lastH = 0;
+
+    function refresh(force) {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
+      // Skip expensive recalculations, getComputedStyle call, and map generation if dimensions are unchanged (unless forced)
+      if (force !== true && w === lastW && h === lastH) return;
+
       const radius = resolveRadius(el, w, h, o.radius);
+      lastW = w;
+      lastH = h;
+
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
