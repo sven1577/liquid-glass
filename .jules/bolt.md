@@ -1,0 +1,3 @@
+## 2025-02-14 - [Caching Canvas Displacement Maps and Avoiding Layout Thrashing]
+**Learning:** In dynamic SVG filter operations like liquid glass / glassmorphism, creating new canvas DOM elements inside high-frequency updates triggers severe GC pauses. Calling `toDataURL()` on canvas elements is also highly CPU-intensive. Finally, repeatedly calling `getComputedStyle()` in resize/refresh callbacks causes costly layout thrashing even when dimensions remain unchanged.
+**Action:** Reuse a single shared canvas instance across all filter generations, cache generated SVG displacement map data-URLs in an LRU cache, and maintain cached width/height dimensions on element instances to exit early from layout calculations if size has not changed.
