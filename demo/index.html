@@ -58,6 +58,10 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -112,6 +116,10 @@
     border-color: rgba(255, 255, 255, 0.5);
     background: rgba(255, 255, 255, 0.13);
   }
+  .card-form input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .card-form button {
     width: 100%; margin-top: 10px; padding: 13px 16px;
     border: none; border-radius: 14px; cursor: pointer;
@@ -122,6 +130,10 @@
   .card-form button:hover {
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
+  }
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -135,6 +147,23 @@
   .card-divider {
     height: 1px; margin: 18px -4px 0;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  }
+  .success-message {
+    display: none;
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    font-size: 14px;
+    line-height: 1.4;
+    color: #fff;
+    text-align: center;
+    animation: fadeIn 0.3s ease forwards;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
   }
   .card-switch {
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -158,6 +187,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
@@ -177,10 +210,11 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
-      <button type="submit">Request invite</button>
+    <form class="card-form" id="signup-form">
+      <input type="email" name="email" id="email-input" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
+      <button type="submit" id="submit-btn">Request invite</button>
     </form>
+    <div class="success-message" id="success-msg" aria-live="polite"></div>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
       <span>Send me product updates</span>
@@ -286,6 +320,35 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    // Form submission simulation
+    const signupForm = document.getElementById("signup-form");
+    const emailInput = document.getElementById("email-input");
+    const submitBtn = document.getElementById("submit-btn");
+    const successMsg = document.getElementById("success-msg");
+
+    if (signupForm) {
+      signupForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+
+        // Disable interactive elements & show loading feedback
+        emailInput.disabled = true;
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Sending...";
+
+        setTimeout(() => {
+          // Hide form and show delightful success message
+          signupForm.style.display = "none";
+          successMsg.innerHTML = "✨ <strong>You're on the list!</strong><br><span style='font-size: 13px; color: var(--ink-dim);'>Check your inbox for your early access invitation soon.</span>";
+          successMsg.style.display = "block";
+
+          // Refresh glass layout dimensions in case of height shift
+          if (window.glassEffect && typeof window.glassEffect.refresh === "function") {
+            window.glassEffect.refresh();
+          }
+        }, 1000);
+      });
+    }
   </script>
 </body>
 </html>
