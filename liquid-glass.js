@@ -19,6 +19,10 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let uid = 0;
   let svgDefs = null;
+  let sharedCanvas = null;
+  let sharedCtx = null;
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 50;
 
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
@@ -57,11 +61,19 @@
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
+  // Performance optimization: reuses a shared canvas/context to reduce memory allocation
+  // and Garbage Collection overhead when maps are generated during fast resize/animation loops.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+
+    if (!sharedCtx) {
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    const ctx = sharedCtx;
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +97,29 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+    return sharedCanvas.toDataURL();
+  }
+
+  // Performance optimization: LRU cache for canvas.toDataURL() results.
+  // dataURI serialization is highly CPU-intensive (especially image compression).
+  // Caching results by keys keeps resize loops lightweight, avoiding redundant work on
+  // commonly hit sizes.
+  function getCachedMap(w, h, radius, border, mapBlur) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      const data = mapCache.get(key);
+      // Evict and re-insert to refresh LRU order
+      mapCache.delete(key);
+      mapCache.set(key, data);
+      return data;
+    }
+    const data = makeMap(w, h, radius, border, mapBlur);
+    mapCache.set(key, data);
+    if (mapCache.size > MAX_CACHE_SIZE) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    return data;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -151,9 +185,19 @@
     return { filter, feImage };
   }
 
-  function resolveRadius(el, w, h, override) {
+  function resolveRadius(el, w, h, override, radiusCache) {
     if (override != null) return override;
-    const raw = getComputedStyle(el).borderTopLeftRadius || "0px";
+    let raw = "";
+    if (radiusCache) {
+      if (radiusCache.raw) {
+        raw = radiusCache.raw;
+      } else {
+        raw = getComputedStyle(el).borderTopLeftRadius || "0px";
+        radiusCache.raw = raw;
+      }
+    } else {
+      raw = getComputedStyle(el).borderTopLeftRadius || "0px";
+    }
     const v = parseFloat(raw) || 0;
     return raw.trim().endsWith("%") ? (v / 100) * Math.min(w, h) : v;
   }
@@ -196,12 +240,19 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
-    function refresh() {
+    // Performance optimization: cache border-radius style to avoid getComputedStyle layout thrashing
+    // during fast frame loops/resize loops unless manually invalidated via refresh(true)
+    const radiusCache = { raw: null };
+
+    function refresh(forceStyleRecalc) {
+      if (forceStyleRecalc === true) {
+        radiusCache.raw = null;
+      }
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
-      const radius = resolveRadius(el, w, h, o.radius);
-      parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
+      const radius = resolveRadius(el, w, h, o.radius, radiusCache);
+      parts.feImage.setAttribute("href", getCachedMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
     }
