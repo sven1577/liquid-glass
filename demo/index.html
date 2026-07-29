@@ -58,6 +58,11 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+    transform: scale(1.04);
+  }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -117,11 +122,33 @@
     border: none; border-radius: 14px; cursor: pointer;
     background: var(--ink); color: #0a0a12;
     font: 600 15px/1.2 inherit; font-family: inherit;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.3s ease, color 0.3s ease;
   }
   .card-form button:hover {
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
+  }
+  .card-form button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px #0a0a12, 0 0 0 4px var(--accent);
+    transform: scale(1.02);
+  }
+  .card-form button.success {
+    background: #22c55e !important;
+    color: #fff !important;
+    cursor: default;
+    transform: none !important;
+    box-shadow: none !important;
+  }
+  @keyframes lg-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  .card-form input.error {
+    border-color: #ff4d4d !important;
+    background: rgba(255, 77, 77, 0.12) !important;
+    animation: lg-shake 0.25s ease-in-out;
   }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -158,6 +185,9 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 2px #0a0a12, 0 0 0 4px var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -286,6 +316,31 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    // ---- Form Submission with Feedback & Validation ----
+    document.querySelector(".card-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const input = form.querySelector("input");
+      const button = form.querySelector("button");
+      const email = input.value.trim();
+
+      // Simple email validation pattern
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        input.classList.add("error");
+        input.focus();
+        setTimeout(() => input.classList.remove("error"), 250);
+        return;
+      }
+
+      // Success animation and disable controls to prevent duplicate submissions
+      button.disabled = true;
+      input.disabled = true;
+      button.classList.add("success");
+      button.textContent = "✓ Check your inbox";
+      input.value = "";
+    });
   </script>
 </body>
 </html>
