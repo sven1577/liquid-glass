@@ -52,16 +52,35 @@
     return svgDefs;
   }
 
+  let sharedCanvas = null;
+  let sharedCtx = null;
+  const mapCache = {};
+  const cacheKeys = [];
+  const MAX_CACHE_SIZE = 30;
+
   // Displacement map, gradient-difference method: a red left->right ramp
   // encodes X displacement, a blue top->bottom ramp encodes Y ("difference"
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache[key]) {
+      // Move to end of cacheKeys to maintain LRU/FIFO ordering
+      const idx = cacheKeys.indexOf(key);
+      if (idx !== -1) cacheKeys.splice(idx, 1);
+      cacheKeys.push(key);
+      return mapCache[key];
+    }
+
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    const canvas = sharedCanvas;
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    const ctx = sharedCtx;
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +104,17 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+    const dataUrl = canvas.toDataURL();
+
+    // Cache the newly generated dataUrl
+    mapCache[key] = dataUrl;
+    cacheKeys.push(key);
+    if (cacheKeys.length > MAX_CACHE_SIZE) {
+      const oldestKey = cacheKeys.shift();
+      delete mapCache[oldestKey];
+    }
+
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -151,9 +180,9 @@
     return { filter, feImage };
   }
 
-  function resolveRadius(el, w, h, override) {
+  function resolveRadius(el, w, h, override, cachedRaw) {
     if (override != null) return override;
-    const raw = getComputedStyle(el).borderTopLeftRadius || "0px";
+    const raw = cachedRaw || getComputedStyle(el).borderTopLeftRadius || "0px";
     const v = parseFloat(raw) || 0;
     return raw.trim().endsWith("%") ? (v / 100) * Math.min(w, h) : v;
   }
@@ -196,11 +225,19 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    // Cache the raw border-radius value to prevent layout thrashing from getComputedStyle
+    const cachedRadiusStyle = o.radius != null ? null : (getComputedStyle(el).borderTopLeftRadius || "0px");
+    let lastW = 0;
+    let lastH = 0;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
-      const radius = resolveRadius(el, w, h, o.radius);
+      if (w === lastW && h === lastH) return;
+      lastW = w;
+      lastH = h;
+      const radius = resolveRadius(el, w, h, o.radius, cachedRadiusStyle);
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
