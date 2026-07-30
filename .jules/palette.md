@@ -1,0 +1,3 @@
+## 2024-07-30 - Keyboard Focus Visibility for Custom Input Elements
+**Learning:** Hiding semantic checkboxes with `opacity: 0; pointer-events: none; position: absolute;` keeps them focusable in the tab sequence but renders them completely invisible to sighted keyboard users. To resolve this without breaking custom-styled elements, we must use adjacent sibling selectors linked with `:focus-visible` (e.g., `input:focus-visible + .switch-track`) to ensure focus outlines remain clearly visible.
+**Action:** Whenever implementing or encountering a custom-styled toggle/form control that wraps or hides standard elements, always link focus-visible states to the custom visual container using adjacent/sibling selectors or `:focus-within`.
