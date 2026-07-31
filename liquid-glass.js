@@ -20,6 +20,48 @@
   let uid = 0;
   let svgDefs = null;
 
+  // Performance Optimization: Shared canvas to avoid GC pressure from dynamic creation.
+  let sharedCanvas = null;
+  let sharedCtx = null;
+
+  function getSharedCanvas(w, h) {
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+    if (!sharedCtx) {
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    return { canvas: sharedCanvas, ctx: sharedCtx };
+  }
+
+  // Performance Optimization: LRU cache for generated data URL maps to avoid canvas.toDataURL CPU bottleneck.
+  const MAP_CACHE_MAX_SIZE = 20;
+  const mapCache = new Map();
+
+  function getCachedMap(w, h, radius, border, mapBlur) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      const val = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, val);
+      return val;
+    }
+    return null;
+  }
+
+  function setCachedMap(w, h, radius, border, mapBlur, dataUrl) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      mapCache.delete(key);
+    } else if (mapCache.size >= MAP_CACHE_MAX_SIZE) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    mapCache.set(key, dataUrl);
+  }
+
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
   const supported = (() => {
@@ -58,10 +100,14 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    // Check LRU cache first to prevent expensive canvas.toDataURL()
+    const cached = getCachedMap(w, h, radius, border, mapBlur);
+    if (cached) return cached;
+
+    // Use shared canvas to avoid GC pressure
+    const s = getSharedCanvas(w, h);
+    const canvas = s.canvas;
+    const ctx = s.ctx;
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +131,10 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = canvas.toDataURL();
+    setCachedMap(w, h, radius, border, mapBlur, dataUrl);
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -151,9 +200,9 @@
     return { filter, feImage };
   }
 
-  function resolveRadius(el, w, h, override) {
+  // Performance Optimization: Cache raw border radius on instance initialization to prevent layout thrashing from getComputedStyle inside hot paths (e.g. ResizeObserver / drag loops).
+  function resolveRadius(raw, w, h, override) {
     if (override != null) return override;
-    const raw = getComputedStyle(el).borderTopLeftRadius || "0px";
     const v = parseFloat(raw) || 0;
     return raw.trim().endsWith("%") ? (v / 100) * Math.min(w, h) : v;
   }
@@ -192,15 +241,26 @@
       } };
     }
 
+    // Performance Optimization: Read and cache raw style once during initialization rather than repeating on every refresh.
+    const cachedBorderRadius = o.radius != null ? null : (getComputedStyle(el).borderTopLeftRadius || "0px");
+
     const id = "lg-filter-" + (++uid);
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
+
+    // Performance Optimization: Keep track of last dimensions to quickly bail out if they haven't changed.
+    let lastW = 0;
+    let lastH = 0;
 
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
-      const radius = resolveRadius(el, w, h, o.radius);
+      if (w === lastW && h === lastH) return; // Dimensions didn't change, avoid regenerating.
+      lastW = w;
+      lastH = h;
+
+      const radius = resolveRadius(cachedBorderRadius, w, h, o.radius);
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
