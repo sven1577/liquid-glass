@@ -1,0 +1,3 @@
+## 2025-03-06 - Accessible Keyboard Focus for Custom Switched Inputs
+**Learning:** For custom-styled toggle switches/checkboxes that hide the semantic input element (e.g. `opacity: 0; position: absolute; pointer-events: none;`), the visual focus state is lost for sighted keyboard navigation users. Sibling or adjacent selector targeting (e.g. `input:focus-visible + .switch-track`) is vital to transfer focus indicators onto the visible custom-styled sibling element.
+**Action:** Always map focus-visible styling to the custom wrapper/track element of a custom toggle switch or checkbox using adjacent sibling selectors `input:focus-visible + .custom-track` to maintain high accessibility.
