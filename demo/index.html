@@ -58,6 +58,10 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -112,6 +116,11 @@
     border-color: rgba(255, 255, 255, 0.5);
     background: rgba(255, 255, 255, 0.13);
   }
+  .card-form input:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(77, 159, 255, 0.3);
+    outline: none;
+  }
   .card-form button {
     width: 100%; margin-top: 10px; padding: 13px 16px;
     border: none; border-radius: 14px; cursor: pointer;
@@ -122,6 +131,26 @@
   .card-form button:hover {
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
+  }
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
+  .form-feedback {
+    margin-top: 10px;
+    font-size: 13px;
+    text-align: center;
+    min-height: 18px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+  .form-feedback.success {
+    color: #30d158; /* Apple green (vibrant on dark) */
+    opacity: 1;
+  }
+  .form-feedback.error {
+    color: #ff453a; /* Apple red (vibrant on dark) */
+    opacity: 1;
   }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -142,6 +171,10 @@
     cursor: pointer; user-select: none;
   }
   .card-switch input { position: absolute; opacity: 0; pointer-events: none; }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
   .switch-track {
     flex: none; width: 46px; height: 27px; border-radius: 999px;
     background: rgba(255, 255, 255, 0.18);
@@ -177,9 +210,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
-      <button type="submit">Request invite</button>
+    <form class="card-form" id="invite-form">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
+      <button type="submit" id="submit-btn">Request invite</button>
+      <div id="form-feedback" aria-live="polite" class="form-feedback"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +320,49 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    // ---- Form Submission simulated micro-UX ----
+    const form = document.getElementById("invite-form");
+    const emailInput = form.querySelector('input[name="email"]');
+    const submitBtn = document.getElementById("submit-btn");
+    const feedback = document.getElementById("form-feedback");
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (submitBtn.disabled) return;
+
+      const email = emailInput.value.trim();
+      if (!email) {
+        feedback.textContent = "Please enter a valid email address.";
+        feedback.className = "form-feedback error";
+        return;
+      }
+
+      // Transition to loading state
+      submitBtn.disabled = true;
+      emailInput.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = "Requesting...";
+      feedback.textContent = "";
+      feedback.className = "form-feedback";
+
+      // Simulate network request
+      setTimeout(() => {
+        submitBtn.textContent = "Success! ✨";
+        feedback.textContent = "You're on the list! Check your inbox.";
+        feedback.className = "form-feedback success";
+
+        // Reset the form after a delay to allow reading the message
+        setTimeout(() => {
+          form.reset();
+          submitBtn.disabled = false;
+          emailInput.disabled = false;
+          submitBtn.textContent = originalText;
+          feedback.className = "form-feedback";
+          feedback.textContent = "";
+        }, 4000);
+      }, 1200);
+    });
   </script>
 </body>
 </html>
