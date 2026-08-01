@@ -19,6 +19,7 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let uid = 0;
   let svgDefs = null;
+  let sharedCanvas = null;
 
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
@@ -52,13 +53,39 @@
     return svgDefs;
   }
 
+  // Simple LRU Cache for generated displacement maps to avoid CPU-heavy canvas.toDataURL() calls
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 100;
+
+  function getCachedMap(w, h, radius, border, mapBlur) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      const val = mapCache.get(key);
+      // Move to end to mark as most recently used
+      mapCache.delete(key);
+      mapCache.set(key, val);
+      return val;
+    }
+    const val = makeMap(w, h, radius, border, mapBlur);
+    mapCache.set(key, val);
+    if (mapCache.size > MAX_CACHE_SIZE) {
+      const firstKey = mapCache.keys().next().value;
+      mapCache.delete(firstKey);
+    }
+    return val;
+  }
+
   // Displacement map, gradient-difference method: a red left->right ramp
   // encodes X displacement, a blue top->bottom ramp encodes Y ("difference"
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    // Reuse a shared canvas instance to prevent GC pressure from dynamic canvas allocation in high-frequency event loops
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    const canvas = sharedCanvas;
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
@@ -196,17 +223,30 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
-    function refresh() {
+    // Cache element dimensions to prevent redundant layout computations and SVG filter updates
+    let lastW = 0;
+    let lastH = 0;
+
+    function refresh(force) {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
+
+      // Skip expensive layout/DOM queries, map generation, and SVG attribute updates if size is unchanged
+      if (!force && w === lastW && h === lastH) {
+        return;
+      }
+
       const radius = resolveRadius(el, w, h, o.radius);
-      parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
+      lastW = w;
+      lastH = h;
+
+      parts.feImage.setAttribute("href", getCachedMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
     }
 
-    refresh();
+    refresh(true);
     el.style.backdropFilter =
       "url(#" + id + ") blur(" + o.blur + "px) saturate(" + o.saturate + ")";
 
