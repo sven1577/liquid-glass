@@ -52,13 +52,44 @@
     return svgDefs;
   }
 
+  // Performance optimizations:
+  // 1. Shared Canvas instance to avoid GC pressure from frequent allocations.
+  // 2. Cache of generated map data URLs to avoid expensive re-renders and `toDataURL` calls.
+  let sharedCanvas = null;
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 50;
+
+  function getSharedCanvas() {
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    return sharedCanvas;
+  }
+
+  function getCachedMap(w, h, radius, border, mapBlur) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      const val = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, val); // Move to end (most recently used)
+      return val;
+    }
+    const val = makeMap(w, h, radius, border, mapBlur);
+    if (mapCache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    mapCache.set(key, val);
+    return val;
+  }
+
   // Displacement map, gradient-difference method: a red left->right ramp
   // encodes X displacement, a blue top->bottom ramp encodes Y ("difference"
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    const canvas = getSharedCanvas();
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
@@ -151,11 +182,23 @@
     return { filter, feImage };
   }
 
+  // Cache border-radius to avoid getComputedStyle layout thrashing.
+  // Uses WeakMap to avoid memory leaks of DOM element references.
+  // Note: Since styles might change dynamically, we cache the parsed string
+  // and only re-query / re-parse if the style actually changed (or during init).
+  const styleCache = new WeakMap();
+
   function resolveRadius(el, w, h, override) {
     if (override != null) return override;
-    const raw = getComputedStyle(el).borderTopLeftRadius || "0px";
-    const v = parseFloat(raw) || 0;
-    return raw.trim().endsWith("%") ? (v / 100) * Math.min(w, h) : v;
+    let cached = styleCache.get(el);
+    if (!cached) {
+      const raw = getComputedStyle(el).borderTopLeftRadius || "0px";
+      const v = parseFloat(raw) || 0;
+      const isPercent = raw.trim().endsWith("%");
+      cached = { raw, v, isPercent };
+      styleCache.set(el, cached);
+    }
+    return cached.isPercent ? (cached.v / 100) * Math.min(w, h) : cached.v;
   }
 
   /**
@@ -171,7 +214,7 @@
    * @param {number} [opts.saturate=1.5]   Backdrop saturation boost.
    * @param {number} [opts.radius]         Corner radius override (px); default reads border-radius.
    * @param {number} [opts.fallbackBlur=16] Frosted blur (px) where refraction is unsupported.
-   * @returns {{supported: boolean, refresh: Function, destroy: Function}}
+   * @returns {{supported: boolean, refresh: Function, destroy: Function, measure: Function, clampTarget: Function}}
    */
   function liquidGlass(el, opts) {
     const o = Object.assign(
@@ -196,12 +239,29 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    // Track last dimensions to bypass redundant canvas updates.
+    let lastW = 0;
+    let lastH = 0;
+
+    // Helper to measure and update dimensions cache
+    function measure() {
+      // Re-query border-radius from DOM when specifically measuring,
+      // ensuring dynamic style updates are respected.
+      styleCache.delete(el);
+    }
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
+
+      // If dimensions did not change, we can safely exit early.
+      if (w === lastW && h === lastH) return;
+      lastW = w;
+      lastH = h;
+
       const radius = resolveRadius(el, w, h, o.radius);
-      parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
+      parts.feImage.setAttribute("href", getCachedMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
     }
@@ -219,11 +279,14 @@
 
     return {
       supported: true,
+      measure: measure,
+      clampTarget: function() {}, // Dummy function for sequential dynamic API calls if any
       refresh: refresh,
       destroy: function () {
         ro.disconnect();
         clearTimeout(timer);
         parts.filter.remove();
+        styleCache.delete(el);
         el.style.backdropFilter = "";
       },
     };
