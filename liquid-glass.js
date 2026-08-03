@@ -20,6 +20,46 @@
   let uid = 0;
   let svgDefs = null;
 
+  // Performance-optimizing cache structures to avoid redundant CPU/DOM operations
+  const styleCache = new WeakMap();
+  const mapCache = new Map();
+  const MAP_CACHE_LIMIT = 50;
+
+  let sharedCanvas = null;
+  let sharedCtx = null;
+
+  function getSharedCanvas(w, h) {
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+    return { canvas: sharedCanvas, ctx: sharedCtx };
+  }
+
+  function getCachedMap(w, h, radius, border, mapBlur) {
+    const key = `${w}_${h}_${radius.toFixed(2)}_${border.toFixed(4)}_${mapBlur}`;
+    if (mapCache.has(key)) {
+      const val = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, val);
+      return val;
+    }
+    return null;
+  }
+
+  function setCachedMap(w, h, radius, border, mapBlur, dataUrl) {
+    const key = `${w}_${h}_${radius.toFixed(2)}_${border.toFixed(4)}_${mapBlur}`;
+    if (mapCache.has(key)) {
+      mapCache.delete(key);
+    } else if (mapCache.size >= MAP_CACHE_LIMIT) {
+      const firstKey = mapCache.keys().next().value;
+      mapCache.delete(firstKey);
+    }
+    mapCache.set(key, dataUrl);
+  }
+
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
   const supported = (() => {
@@ -58,10 +98,10 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    const cached = getCachedMap(w, h, radius, border, mapBlur);
+    if (cached) return cached;
+
+    const { canvas, ctx } = getSharedCanvas(w, h);
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +125,10 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = canvas.toDataURL();
+    setCachedMap(w, h, radius, border, mapBlur, dataUrl);
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -151,9 +194,16 @@
     return { filter, feImage };
   }
 
-  function resolveRadius(el, w, h, override) {
+  function resolveRadius(el, w, h, override, bypassCache) {
     if (override != null) return override;
-    const raw = getComputedStyle(el).borderTopLeftRadius || "0px";
+    if (bypassCache) {
+      styleCache.delete(el);
+    }
+    let raw = styleCache.get(el);
+    if (raw === undefined) {
+      raw = getComputedStyle(el).borderTopLeftRadius || "0px";
+      styleCache.set(el, raw);
+    }
     const v = parseFloat(raw) || 0;
     return raw.trim().endsWith("%") ? (v / 100) * Math.min(w, h) : v;
   }
@@ -196,11 +246,17 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
-    function refresh() {
+    let lastW = 0;
+    let lastH = 0;
+
+    function refresh(bypassCache) {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
-      const radius = resolveRadius(el, w, h, o.radius);
+      const radius = resolveRadius(el, w, h, o.radius, bypassCache);
+      if (!bypassCache && w === lastW && h === lastH) return;
+      lastW = w;
+      lastH = h;
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
@@ -219,12 +275,15 @@
 
     return {
       supported: true,
-      refresh: refresh,
+      refresh: function () {
+        refresh(true);
+      },
       destroy: function () {
         ro.disconnect();
         clearTimeout(timer);
         parts.filter.remove();
         el.style.backdropFilter = "";
+        styleCache.delete(el);
       },
     };
   }
