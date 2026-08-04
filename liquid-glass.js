@@ -20,6 +20,13 @@
   let uid = 0;
   let svgDefs = null;
 
+  // Shared canvas and context reused across makeMap calls to minimize garbage collection (GC) overhead.
+  let sharedCanvas = null;
+  let sharedCtx = null;
+
+  // Caching map results to avoid repeating expensive canvas drawing and toDataURL operations.
+  const mapCache = new Map();
+
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
   const supported = (() => {
@@ -58,10 +65,27 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    // Generate cache key to avoid repeating drawing operations for the same parameters
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      // LRU refresh: move accessed key to the end of the Map
+      const cachedVal = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, cachedVal);
+      return cachedVal;
+    }
+
+    // Reuse a single shared canvas element to avoid GC pressure from dynamic canvas creation.
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+
+    // Setting width and height resets the canvas state (filters, transformations, composite modes).
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+
+    const ctx = sharedCtx;
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +109,17 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = sharedCanvas.toDataURL();
+
+    // Cache the result. Limit map cache size to prevent memory creep.
+    mapCache.set(key, dataUrl);
+    if (mapCache.size > 50) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -153,6 +187,10 @@
 
   function resolveRadius(el, w, h, override) {
     if (override != null) return override;
+
+    // Read computed border-radius. This runs only when dimensions actually change,
+    // which prevents layout thrashing during standard frames while maintaining
+    // correctness for media queries and class toggles.
     const raw = getComputedStyle(el).borderTopLeftRadius || "0px";
     const v = parseFloat(raw) || 0;
     return raw.trim().endsWith("%") ? (v / 100) * Math.min(w, h) : v;
@@ -196,10 +234,17 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    // Store last dimensions on instances to prevent redundant canvas updates when layout size did not change.
+    let lastW = 0;
+    let lastH = 0;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
+      if (w === lastW && h === lastH) return;
+      lastW = w;
+      lastH = h;
       const radius = resolveRadius(el, w, h, o.radius);
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
