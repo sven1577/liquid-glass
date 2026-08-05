@@ -158,6 +158,26 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+
+  /* ---- Focus Visible Accessibility Styling ---- */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .card-form input:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(77, 159, 255, 0.35);
+  }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 </style>
 </head>
 <body>
@@ -286,6 +306,64 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    // ---- Form Submission micro-UX ----
+    (function() {
+      const form = document.querySelector(".card-form");
+      if (!form) return;
+
+      const emailInput = form.querySelector("input[name='email']");
+      if (emailInput) {
+        emailInput.required = true;
+      }
+
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const input = form.querySelector("input[name='email']");
+        const button = form.querySelector("button[type='submit']");
+        if (!input || !button) return;
+
+        if (!input.value || !input.checkValidity()) {
+          input.reportValidity();
+          return;
+        }
+
+        input.disabled = true;
+        button.disabled = true;
+        button.textContent = "Requesting...";
+        button.style.opacity = "0.75";
+        button.style.cursor = "not-allowed";
+
+        setTimeout(() => {
+          const successDiv = document.createElement("div");
+          successDiv.className = "card-success";
+          successDiv.style.textAlign = "center";
+          successDiv.style.padding = "14px 0 6px";
+          successDiv.style.animation = "fadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards";
+          successDiv.innerHTML = `
+            <span style="font-size: 32px; display: block; margin-bottom: 10px; filter: drop-shadow(0 4px 12px rgba(77, 159, 255, 0.3));">✨</span>
+            <h3 style="font-size: 17px; font-weight: 700; margin-bottom: 6px; color: #fff;">You're on the list!</h3>
+            <p style="font-size: 13.5px; line-height: 1.45; color: var(--ink-dim);">We've registered <strong style="color: #fff; font-weight: 600;">${escapeHTML(input.value)}</strong> for early beta access.</p>
+          `;
+
+          form.replaceWith(successDiv);
+
+          if (window.glassCard) {
+            window.glassCard.measure();
+            window.glassCard.clampTarget();
+          }
+          if (window.glassEffect) {
+            window.glassEffect.refresh();
+          }
+        }, 800);
+      });
+
+      function escapeHTML(str) {
+        return str.replace(/[&<>'"]/g,
+          tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+        );
+      }
+    })();
   </script>
 </body>
 </html>
