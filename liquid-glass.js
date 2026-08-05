@@ -19,6 +19,38 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let uid = 0;
   let svgDefs = null;
+  let sharedCanvas = null;
+
+  // Reuses a single canvas element across all map generations to reduce GC pressure.
+  function getSharedCanvas() {
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    return sharedCanvas;
+  }
+
+  // LRU cache for generated data URL maps.
+  // Performance Optimization: Caching up to 16 generated maps avoids highly expensive canvas
+  // drawing operations and `toDataURL` string serialization, which are major bottlenecks.
+  const MAX_CACHE_SIZE = 16;
+  const mapCache = new Map();
+
+  function getCachedMap(w, h, radius, border, mapBlur) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      const val = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, val);
+      return val;
+    }
+    const dataUrl = makeMap(w, h, radius, border, mapBlur);
+    if (mapCache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    mapCache.set(key, dataUrl);
+    return dataUrl;
+  }
 
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
@@ -58,7 +90,8 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    // Reusing the shared canvas to avoid garbage collection overhead from dynamic canvas creation.
+    const canvas = getSharedCanvas();
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
@@ -196,12 +229,28 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    // Cache the last measured dimensions to avoid unnecessary DOM operations, canvas drawings, and attribute updates in refresh().
+    let lastW = null;
+    let lastH = null;
+    let lastRadius = null;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
-      parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
+
+      // If dimensions and radius didn't change, we can completely skip re-rendering and DOM updates.
+      if (w === lastW && h === lastH && radius === lastRadius) {
+        return;
+      }
+
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
+
+      // Retrieve generated map from LRU cache to bypass canvas re-rendering & toDataURL serialization when possible
+      parts.feImage.setAttribute("href", getCachedMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
     }
