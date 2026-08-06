@@ -20,6 +20,32 @@
   let uid = 0;
   let svgDefs = null;
 
+  // Shared canvas and context for displacement map rendering to eliminate GC overhead
+  let sharedCanvas = null;
+  let sharedCtx = null;
+
+  // Simple LRU cache for generated displacement maps to avoid redundant, expensive .toDataURL() calls
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 50;
+
+  function getCachedMap(w, h, radius, border, mapBlur) {
+    const key = `${w}_${h}_${radius}_${border}_${mapBlur}`;
+    if (mapCache.has(key)) {
+      const dataUrl = mapCache.get(key);
+      // Move to end (most recently used)
+      mapCache.delete(key);
+      mapCache.set(key, dataUrl);
+      return dataUrl;
+    }
+    const dataUrl = makeMap(w, h, radius, border, mapBlur);
+    mapCache.set(key, dataUrl);
+    if (mapCache.size > MAX_CACHE_SIZE) {
+      const firstKey = mapCache.keys().next().value;
+      mapCache.delete(firstKey);
+    }
+    return dataUrl;
+  }
+
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
   const supported = (() => {
@@ -58,10 +84,19 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    const canvas = sharedCanvas;
+    const ctx = sharedCtx;
+
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext("2d");
+
+    // Reset compositing and filter states before drawing
+    ctx.globalCompositeOperation = "source-over";
+    ctx.filter = "none";
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -196,12 +231,25 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    let lastW = null;
+    let lastH = null;
+    let lastRadius = null;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
-      parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
+
+      // Cache checks to skip regeneration if layout and border radius remain identical
+      if (w === lastW && h === lastH && radius === lastRadius) {
+        return;
+      }
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
+
+      parts.feImage.setAttribute("href", getCachedMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
     }
