@@ -1,0 +1,3 @@
+## 2024-08-06 - Eliminating Canvas GC Pressure and `toDataURL` Bottlenecks
+**Learning:** In highly interactive components with rapid updates (e.g., dragging cards with spring physics), dynamic canvas instantiation and repeated calls to `canvas.toDataURL()` lead to severe garbage collection pressure and main-thread blocking. A shared global canvas paired with a Map-based LRU cache and element dimension caching effectively eliminates these bottlenecks.
+**Action:** Always reuse a module-level shared canvas and implement LRU/dimension caching for expensive rendering and serialization operations in high-frequency update paths.
