@@ -111,6 +111,7 @@
   .card-form input:focus {
     border-color: rgba(255, 255, 255, 0.5);
     background: rgba(255, 255, 255, 0.13);
+    box-shadow: 0 0 0 3px rgba(77, 159, 255, 0.4);
   }
   .card-form button {
     width: 100%; margin-top: 10px; padding: 13px 16px;
@@ -158,6 +159,24 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+
+  /* Accessibility focus indicators */
+  .hero .cta:focus-visible,
+  .card-form button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--accent), 0 8px 32px rgba(255, 255, 255, 0.25);
+    transform: scale(1.02);
+  }
+  .hero .cta:focus-visible {
+    transform: scale(1.04);
+  }
+  .card-switch input:focus-visible + .switch-track {
+    box-shadow: 0 0 0 3px rgba(77, 159, 255, 0.5), inset 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 </style>
 </head>
 <body>
@@ -177,8 +196,8 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
+    <form class="card-form">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
       <button type="submit">Request invite</button>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
@@ -286,6 +305,56 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    // ---- Form Submission & Interaction Feedback ----
+    const form = document.querySelector(".card-form");
+    if (form) {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        const input = form.querySelector("input[type='email']");
+        const button = form.querySelector("button[type='submit']");
+        if (!input || !button || !input.value) return;
+
+        // Visual feedback: loading state
+        button.disabled = true;
+        input.disabled = true;
+        button.textContent = "Requesting...";
+        button.style.opacity = "0.7";
+        button.style.cursor = "not-allowed";
+
+        setTimeout(() => {
+          // Create success message container
+          const successDiv = document.createElement("div");
+          successDiv.className = "success-message";
+          successDiv.style.animation = "fadeIn 0.4s ease forwards";
+
+          function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+          }
+
+          successDiv.innerHTML = `
+            <div style="text-align: center; padding: 10px 0;">
+              <span style="font-size: 24px; display: block; margin-bottom: 8px;">✨</span>
+              <p style="font-weight: 600; font-size: 15px; color: #fff; margin-bottom: 4px;">You're on the list!</p>
+              <p style="font-size: 13px; color: var(--ink-dim);">We'll email you at <strong>${escapeHtml(input.value)}</strong></p>
+            </div>
+          `;
+
+          // Replace the form contents with the success message
+          form.style.display = "none";
+          form.parentNode.insertBefore(successDiv, form.nextSibling);
+
+          // Recalculate layout of glassmorphic container sequentially to prevent alignment and clipping bugs
+          if (window.glassCard) {
+            window.glassCard.measure();
+            window.glassCard.clampTarget();
+          }
+          if (window.glassEffect) {
+            window.glassEffect.refresh();
+          }
+        }, 800);
+      });
+    }
   </script>
 </body>
 </html>
