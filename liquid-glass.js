@@ -19,6 +19,12 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let uid = 0;
   let svgDefs = null;
+  let sharedCanvas = null;
+
+  // Cache generated displacement map data URLs to avoid heavy canvas drawing and toDataURL calls.
+  // Using an LRU-like Map cache capped at 16 unique entries.
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 16;
 
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
@@ -58,7 +64,21 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    // Generate cache key representing the parameters used to generate the map.
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      // LRU refresh
+      const dataUrl = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, dataUrl);
+      return dataUrl;
+    }
+
+    // Re-use a single, module-level canvas element to avoid GC pressure from frequent canvas instantiation.
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    const canvas = sharedCanvas;
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
@@ -85,7 +105,17 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = canvas.toDataURL();
+    mapCache.set(key, dataUrl);
+
+    // Maintain cache size constraint
+    if (mapCache.size > MAX_CACHE_SIZE) {
+      const firstKey = mapCache.keys().next().value;
+      mapCache.delete(firstKey);
+    }
+
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,11 +226,26 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    // Cache the last known width, height, and resolved radius to avoid redundant processing/map generation on resize events
+    let lastW = 0;
+    let lastH = 0;
+    let lastRadius = -1;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
+
+      // Skip heavy operations if dimensions and radius are unchanged.
+      if (w === lastW && h === lastH && radius === lastRadius) {
+        return;
+      }
+
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
+
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
