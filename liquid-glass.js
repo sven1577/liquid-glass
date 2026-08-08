@@ -20,6 +20,34 @@
   let uid = 0;
   let svgDefs = null;
 
+  let sharedCanvas = null;
+  const MAP_CACHE_LIMIT = 30;
+  const mapCache = new Map();
+
+  function getSharedCanvas() {
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    return sharedCanvas;
+  }
+
+  function getCachedMap(w, h, radius, border, mapBlur) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      const val = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, val);
+      return val;
+    }
+    const dataURL = makeMap(w, h, radius, border, mapBlur);
+    mapCache.set(key, dataURL);
+    if (mapCache.size > MAP_CACHE_LIMIT) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    return dataURL;
+  }
+
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
   const supported = (() => {
@@ -58,10 +86,13 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    const canvas = getSharedCanvas();
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
+
+    // Clear previous drawing data to avoid artifacts
+    ctx.clearRect(0, 0, w, h);
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -196,12 +227,24 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    let lastW = 0;
+    let lastH = 0;
+    let lastRadius = 0;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
-      parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
+
+      // Early return if dimensions are unchanged to save map generation/render overhead
+      if (w === lastW && h === lastH && radius === lastRadius) return;
+
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
+
+      parts.feImage.setAttribute("href", getCachedMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
     }
