@@ -1,0 +1,3 @@
+## 2025-03-05 - Draggable Card Keyboard Accessibility & Focus Outlines
+**Learning:** For draggable floating UI widgets with spring-physics, setting a tabindex allows focus, but we need to map keyboard keys to the spring physics target coordinates (rather than absolute position steps) to preserve the smooth animated feeling. Focus indicators for hidden semantic checkboxes must be mapped using input:focus-visible + sibling selectors.
+**Action:** Always map Arrow keys to spring target variables (tx/ty) rather than modifying render coordinates directly. Ensure focus-visible sibling selectors are correctly targeted for customized UI elements like toggle switches.
