@@ -20,6 +20,15 @@
   let uid = 0;
   let svgDefs = null;
 
+  // OPTIMIZATION: Reusable shared canvas instance to prevent GC pressure from creating
+  // multiple canvas elements repeatedly during rapid dimension changes (e.g., resizing/dragging).
+  let sharedCanvas = null;
+
+  // OPTIMIZATION: Lightweight LRU cache to store and retrieve previously generated
+  // displacement maps. This bypasses expensive redrawing and CPU-heavy toDataURL() conversions.
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 100;
+
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
   const supported = (() => {
@@ -57,8 +66,23 @@
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
+  //
+  // OPTIMIZED: Reuses a single shared canvas and caches results using a Map
+  // with an LRU eviction policy to avoid CPU-heavy toDataURL() calls and GC overhead.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    const key = w + "x" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      // LRU refresh: move accessed item to the end of insertion order
+      const value = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, value);
+      return value;
+    }
+
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    const canvas = sharedCanvas;
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
@@ -85,7 +109,17 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = canvas.toDataURL();
+    mapCache.set(key, dataUrl);
+
+    // Evict the oldest entry if max cache size is exceeded
+    if (mapCache.size > MAX_CACHE_SIZE) {
+      const firstKey = mapCache.keys().next().value;
+      mapCache.delete(firstKey);
+    }
+
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
