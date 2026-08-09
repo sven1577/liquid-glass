@@ -58,6 +58,10 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -74,6 +78,11 @@
       inset 0 0 0 1px rgba(255, 255, 255, 0.13);
     cursor: grab; touch-action: none;
     will-change: transform;
+    outline: none;
+  }
+  .glass-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
   }
   .glass-card:active { cursor: grabbing; }
   /* cursor-tracked glare */
@@ -112,16 +121,25 @@
     border-color: rgba(255, 255, 255, 0.5);
     background: rgba(255, 255, 255, 0.13);
   }
+  .card-form input:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(77, 159, 255, 0.35);
+  }
   .card-form button {
     width: 100%; margin-top: 10px; padding: 13px 16px;
     border: none; border-radius: 14px; cursor: pointer;
     background: var(--ink); color: #0a0a12;
     font: 600 15px/1.2 inherit; font-family: inherit;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
+    outline: none;
   }
   .card-form button:hover {
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
+  }
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
   }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -158,6 +176,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 </style>
 </head>
 <body>
@@ -170,7 +192,7 @@
     <a class="cta" href="https://github.com/deepika-builds/liquid-glass">Get the file</a>
   </main>
 
-  <div class="glass-card" id="card" role="group" aria-label="Early access signup">
+  <div class="glass-card" id="card" role="group" aria-label="Early access signup" tabindex="0">
     <div class="card-grip" aria-hidden="true"></div>
     <div class="card-head">
       <h2>Get early access</h2>
@@ -212,6 +234,7 @@
         el.addEventListener("pointermove", (e) => this.onMove(e));
         el.addEventListener("pointerup", (e) => this.onUp(e));
         el.addEventListener("pointercancel", (e) => this.onUp(e));
+        el.addEventListener("keydown", (e) => this.onKeyDown(e));
         window.addEventListener("resize", () => this.onResize());
 
         this.clampTarget();
@@ -250,6 +273,34 @@
         this.dragging = false;
         if (this.el.hasPointerCapture(e.pointerId)) {
           this.el.releasePointerCapture(e.pointerId);
+        }
+      }
+
+      onKeyDown(e) {
+        if (e.target !== this.el) return;
+        const step = e.shiftKey ? 100 : 15;
+        let moved = false;
+        switch (e.key) {
+          case "ArrowLeft":
+            this.tx -= step;
+            moved = true;
+            break;
+          case "ArrowRight":
+            this.tx += step;
+            moved = true;
+            break;
+          case "ArrowUp":
+            this.ty -= step;
+            moved = true;
+            break;
+          case "ArrowDown":
+            this.ty += step;
+            moved = true;
+            break;
+        }
+        if (moved) {
+          e.preventDefault();
+          this.clampTarget();
         }
       }
 
