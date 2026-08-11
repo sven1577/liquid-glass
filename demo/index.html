@@ -158,6 +158,37 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+
+  /* ---- Keyboard Focus States ---- */
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
+  .glass-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.45),
+      0 0 0 4px rgba(77, 159, 255, 0.35),
+      inset 0 1px 1px rgba(255, 255, 255, 0.5),
+      inset 0 -8px 20px rgba(255, 255, 255, 0.06),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.13);
+  }
+  .card-form input:focus-visible {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(77, 159, 255, 0.35);
+    background: rgba(255, 255, 255, 0.13);
+  }
+  .card-form button:focus-visible {
+    outline: none;
+    transform: scale(1.02);
+    box-shadow: 0 0 0 3px var(--accent);
+  }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 </style>
 </head>
 <body>
@@ -170,7 +201,7 @@
     <a class="cta" href="https://github.com/deepika-builds/liquid-glass">Get the file</a>
   </main>
 
-  <div class="glass-card" id="card" role="group" aria-label="Early access signup">
+  <div class="glass-card" id="card" role="group" aria-label="Early access signup. Use Arrow keys to move." tabindex="0">
     <div class="card-grip" aria-hidden="true"></div>
     <div class="card-head">
       <h2>Get early access</h2>
@@ -212,6 +243,7 @@
         el.addEventListener("pointermove", (e) => this.onMove(e));
         el.addEventListener("pointerup", (e) => this.onUp(e));
         el.addEventListener("pointercancel", (e) => this.onUp(e));
+        el.addEventListener("keydown", (e) => this.onKeyDown(e));
         window.addEventListener("resize", () => this.onResize());
 
         this.clampTarget();
@@ -256,6 +288,29 @@
       onResize() {
         this.measure(); // map regeneration is handled by liquid-glass.js
         this.clampTarget();
+      }
+
+      onKeyDown(e) {
+        if (e.target.closest("input, button, a, label")) return;
+        const step = e.shiftKey ? 40 : 10;
+        let moved = false;
+        if (e.key === "ArrowLeft") {
+          this.tx -= step;
+          moved = true;
+        } else if (e.key === "ArrowRight") {
+          this.tx += step;
+          moved = true;
+        } else if (e.key === "ArrowUp") {
+          this.ty -= step;
+          moved = true;
+        } else if (e.key === "ArrowDown") {
+          this.ty += step;
+          moved = true;
+        }
+        if (moved) {
+          e.preventDefault();
+          this.clampTarget();
+        }
       }
 
       clampTarget() {
