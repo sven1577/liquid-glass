@@ -19,6 +19,34 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let uid = 0;
   let svgDefs = null;
+  let sharedCanvas = null;
+
+  // Performance Optimization (Bolt): LRU cache for generated data URLs to avoid
+  // expensive main-thread synchronous toDataURL PNG compression on repetitive sizes/inputs.
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 32;
+
+  function getCachedMap(w, h, radius, border, mapBlur) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      const val = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, val);
+      return val;
+    }
+    return null;
+  }
+
+  function setCachedMap(w, h, radius, border, mapBlur, val) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      mapCache.delete(key);
+    } else if (mapCache.size >= MAX_CACHE_SIZE) {
+      const firstKey = mapCache.keys().next().value;
+      mapCache.delete(firstKey);
+    }
+    mapCache.set(key, val);
+  }
 
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
@@ -58,7 +86,15 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    const cached = getCachedMap(w, h, radius, border, mapBlur);
+    if (cached) return cached;
+
+    // Performance Optimization (Bolt): Reuse a single shared canvas instance
+    // to reduce memory allocation overhead and avoid GC pressure from frequent canvas allocations.
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+    }
+    const canvas = sharedCanvas;
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
@@ -85,7 +121,10 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataURL = canvas.toDataURL();
+    setCachedMap(w, h, radius, border, mapBlur, dataURL);
+    return dataURL;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
