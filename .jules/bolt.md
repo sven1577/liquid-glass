@@ -1,0 +1,3 @@
+## 2025-02-14 - Canvas Reuse & Instance Cache
+**Learning:** Reusing a shared offscreen canvas and caching generated maps (bounded LRU) avoids garbage collection spikes and expensive toDataURL calls. However, caching DOM styles like border-radius globally via WeakMaps carries cache invalidation risks when styles change dynamically. Caching measurements and styles locally on the instance scope instead ensures correct, safe updates.
+**Action:** Always reuse canvas contexts, cache expensive serialization results using bounded LRU caches, and prefer local instance scope caching over persistent cross-instance style/DOM caches to prevent invalidation bugs.
