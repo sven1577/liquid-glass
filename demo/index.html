@@ -74,8 +74,13 @@
       inset 0 0 0 1px rgba(255, 255, 255, 0.13);
     cursor: grab; touch-action: none;
     will-change: transform;
+    transition: outline 0.15s ease, outline-offset 0.15s ease;
   }
   .glass-card:active { cursor: grabbing; }
+  .glass-card:focus-visible {
+    outline: 2.5px solid var(--accent);
+    outline-offset: 4px;
+  }
   /* cursor-tracked glare */
   .glass-card::after {
     content: ""; position: absolute; inset: 0; border-radius: inherit;
@@ -123,6 +128,14 @@
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
   }
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .card-form input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
@@ -158,6 +171,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 </style>
 </head>
 <body>
@@ -166,11 +183,11 @@
 
   <main class="hero">
     <h1>Liquid Glass</h1>
-    <p class="hint">Drag the card across the photo. Scroll to watch it bend the detail underneath.</p>
+    <p class="hint">Drag the card across the photo, or use Arrow keys when focused. Scroll to watch it bend the detail underneath.</p>
     <a class="cta" href="https://github.com/deepika-builds/liquid-glass">Get the file</a>
   </main>
 
-  <div class="glass-card" id="card" role="group" aria-label="Early access signup">
+  <div class="glass-card" id="card" role="group" aria-label="Early access signup" tabindex="0">
     <div class="card-grip" aria-hidden="true"></div>
     <div class="card-head">
       <h2>Get early access</h2>
@@ -212,6 +229,7 @@
         el.addEventListener("pointermove", (e) => this.onMove(e));
         el.addEventListener("pointerup", (e) => this.onUp(e));
         el.addEventListener("pointercancel", (e) => this.onUp(e));
+        el.addEventListener("keydown", (e) => this.onKeyDown(e));
         window.addEventListener("resize", () => this.onResize());
 
         this.clampTarget();
@@ -244,6 +262,34 @@
         this.tx = e.clientX - this.grabDX;
         this.ty = e.clientY - this.grabDY;
         this.clampTarget();
+      }
+
+      onKeyDown(e) {
+        if (e.target !== this.el) return;
+        let step = e.shiftKey ? 80 : 20;
+        let moved = false;
+        switch (e.key) {
+          case "ArrowUp":
+            this.ty -= step;
+            moved = true;
+            break;
+          case "ArrowDown":
+            this.ty += step;
+            moved = true;
+            break;
+          case "ArrowLeft":
+            this.tx -= step;
+            moved = true;
+            break;
+          case "ArrowRight":
+            this.tx += step;
+            moved = true;
+            break;
+        }
+        if (moved) {
+          e.preventDefault();
+          this.clampTarget();
+        }
       }
 
       onUp(e) {
