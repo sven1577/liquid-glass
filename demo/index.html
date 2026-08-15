@@ -123,6 +123,20 @@
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
   }
+  .card-form input:focus-visible,
+  .card-form button:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+  }
+  .card-form button:disabled {
+    opacity: 0.85;
+    cursor: not-allowed;
+    transform: none;
+  }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
@@ -177,9 +191,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
+    <form class="card-form" id="invite-form">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
       <button type="submit">Request invite</button>
+      <div id="form-status" aria-live="polite" class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0;"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +301,38 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    // Form feedback handling
+    const form = document.getElementById("invite-form");
+    const button = form.querySelector("button");
+    const input = form.querySelector("input");
+    const status = document.getElementById("form-status");
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (!input.checkValidity()) return;
+
+      button.disabled = true;
+      const origText = button.textContent;
+      button.textContent = "Requesting...";
+      status.textContent = "Sending request...";
+
+      setTimeout(() => {
+        button.textContent = "✓ You're on the list!";
+        button.style.background = "#34c759";
+        button.style.color = "#fff";
+        status.textContent = "Successfully requested early access!";
+
+        setTimeout(() => {
+          button.textContent = origText;
+          button.style.background = "";
+          button.style.color = "";
+          button.disabled = false;
+          input.value = "";
+          status.textContent = "";
+        }, 3000);
+      }, 600);
+    });
   </script>
 </body>
 </html>
