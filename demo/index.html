@@ -146,7 +146,7 @@
     flex: none; width: 46px; height: 27px; border-radius: 999px;
     background: rgba(255, 255, 255, 0.18);
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
-    transition: background 0.2s ease;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
     display: block; position: relative;
   }
   .switch-thumb {
@@ -158,6 +158,9 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 2px var(--accent);
+  }
 </style>
 </head>
 <body>
