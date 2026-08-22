@@ -58,6 +58,12 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible,
+  .card-form button:focus-visible,
+  .card-form input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -76,6 +82,10 @@
     will-change: transform;
   }
   .glass-card:active { cursor: grabbing; }
+  .glass-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
   /* cursor-tracked glare */
   .glass-card::after {
     content: ""; position: absolute; inset: 0; border-radius: inherit;
@@ -158,6 +168,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 </style>
 </head>
 <body>
@@ -170,7 +184,7 @@
     <a class="cta" href="https://github.com/deepika-builds/liquid-glass">Get the file</a>
   </main>
 
-  <div class="glass-card" id="card" role="group" aria-label="Early access signup">
+  <div class="glass-card" id="card" tabindex="0" role="region" aria-label="Early access signup card (Use arrow keys to move)">
     <div class="card-grip" aria-hidden="true"></div>
     <div class="card-head">
       <h2>Get early access</h2>
@@ -212,6 +226,7 @@
         el.addEventListener("pointermove", (e) => this.onMove(e));
         el.addEventListener("pointerup", (e) => this.onUp(e));
         el.addEventListener("pointercancel", (e) => this.onUp(e));
+        el.addEventListener("keydown", (e) => this.onKey(e));
         window.addEventListener("resize", () => this.onResize());
 
         this.clampTarget();
@@ -251,6 +266,20 @@
         if (this.el.hasPointerCapture(e.pointerId)) {
           this.el.releasePointerCapture(e.pointerId);
         }
+      }
+
+      onKey(e) {
+        if (e.target !== this.el) return;
+        const step = e.shiftKey ? 40 : 10;
+        switch (e.key) {
+          case "ArrowLeft": this.tx -= step; break;
+          case "ArrowRight": this.tx += step; break;
+          case "ArrowUp": this.ty -= step; break;
+          case "ArrowDown": this.ty += step; break;
+          default: return;
+        }
+        e.preventDefault();
+        this.clampTarget();
       }
 
       onResize() {
