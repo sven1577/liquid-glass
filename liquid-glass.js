@@ -19,6 +19,10 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let uid = 0;
   let svgDefs = null;
+  let sharedCanvas = null;
+  let sharedCtx = null;
+  const MAP_CACHE_LIMIT = 32;
+  const mapCache = new Map();
 
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
@@ -57,11 +61,24 @@
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
+  // Optimization: Reuses a shared offscreen canvas context to eliminate GC pressure
+  // and uses a bounded LRU cache for data URIs to avoid CPU-heavy re-renders.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    const cacheKey = w + ":" + h + ":" + radius + ":" + border + ":" + mapBlur;
+    if (mapCache.has(cacheKey)) {
+      const cached = mapCache.get(cacheKey);
+      mapCache.delete(cacheKey);
+      mapCache.set(cacheKey, cached);
+      return cached;
+    }
+
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+    const ctx = sharedCtx;
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +102,14 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = sharedCanvas.toDataURL();
+    if (mapCache.size >= MAP_CACHE_LIMIT) {
+      const firstKey = mapCache.keys().next().value;
+      mapCache.delete(firstKey);
+    }
+    mapCache.set(cacheKey, dataUrl);
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -195,12 +219,16 @@
     const id = "lg-filter-" + (++uid);
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
+    let lastMapKey = "";
 
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
+      const mapKey = w + ":" + h + ":" + radius + ":" + o.border + ":" + o.mapBlur;
+      if (mapKey === lastMapKey) return;
+      lastMapKey = mapKey;
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
