@@ -1,0 +1,3 @@
+## 2025-05-18 - Offscreen Canvas Re-use & Map LRU Caching in SVG Filters
+**Learning:** In client-rendered SVG displacement filter generation, instantiating new HTMLCanvasElements and generating data URLs on every layout update creates significant GC pressure and CPU bottlenecks. Bounded LRU caching of generated data URIs keyed by element dimensions/radii alongside a shared offscreen canvas context reduces dynamic memory allocations and CPU overhead during refresh cycles.
+**Action:** Always reuse canvas contexts for procedural asset generation and cache data URL results using bounded LRU cache maps when inputs (dimensions, radii) are discrete.
