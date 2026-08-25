@@ -76,6 +76,10 @@
     will-change: transform;
   }
   .glass-card:active { cursor: grabbing; }
+  .glass-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
   /* cursor-tracked glare */
   .glass-card::after {
     content: ""; position: absolute; inset: 0; border-radius: inherit;
@@ -158,6 +162,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
@@ -170,7 +178,7 @@
     <a class="cta" href="https://github.com/deepika-builds/liquid-glass">Get the file</a>
   </main>
 
-  <div class="glass-card" id="card" role="group" aria-label="Early access signup">
+  <div class="glass-card" id="card" role="group" aria-label="Early access signup" tabindex="0">
     <div class="card-grip" aria-hidden="true"></div>
     <div class="card-head">
       <h2>Get early access</h2>
@@ -212,6 +220,7 @@
         el.addEventListener("pointermove", (e) => this.onMove(e));
         el.addEventListener("pointerup", (e) => this.onUp(e));
         el.addEventListener("pointercancel", (e) => this.onUp(e));
+        el.addEventListener("keydown", (e) => this.onKeyDown(e));
         window.addEventListener("resize", () => this.onResize());
 
         this.clampTarget();
@@ -251,6 +260,29 @@
         if (this.el.hasPointerCapture(e.pointerId)) {
           this.el.releasePointerCapture(e.pointerId);
         }
+      }
+
+      onKeyDown(e) {
+        if (e.target !== this.el) return;
+        const step = e.shiftKey ? 40 : 10;
+        switch (e.key) {
+          case "ArrowLeft":
+            this.tx -= step;
+            break;
+          case "ArrowRight":
+            this.tx += step;
+            break;
+          case "ArrowUp":
+            this.ty -= step;
+            break;
+          case "ArrowDown":
+            this.ty += step;
+            break;
+          default:
+            return;
+        }
+        e.preventDefault();
+        this.clampTarget();
       }
 
       onResize() {
