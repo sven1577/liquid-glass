@@ -217,7 +217,15 @@
         this.clampTarget();
         this.x = this.tx; this.y = this.ty;
         this.render();
-        requestAnimationFrame(() => this.tick());
+        this.animating = false;
+        this.startLoop();
+      }
+
+      startLoop() {
+        if (!this.animating) {
+          this.animating = true;
+          requestAnimationFrame(() => this.tick());
+        }
       }
 
       measure() {
@@ -244,6 +252,7 @@
         this.tx = e.clientX - this.grabDX;
         this.ty = e.clientY - this.grabDY;
         this.clampTarget();
+        this.startLoop();
       }
 
       onUp(e) {
@@ -256,6 +265,7 @@
       onResize() {
         this.measure(); // map regeneration is handled by liquid-glass.js
         this.clampTarget();
+        this.startLoop();
       }
 
       clampTarget() {
@@ -269,6 +279,19 @@
         this.vy = (this.vy + (this.ty - this.y) * this.stiffness) * this.damping;
         this.x += this.vx;
         this.y += this.vy;
+
+        // Pause animation when physics settle below threshold (<0.001px distance & velocity)
+        // to avoid unnecessary background CPU/GPU usage & idle style recalculations.
+        if (Math.hypot(this.tx - this.x, this.ty - this.y) < 0.001 && Math.hypot(this.vx, this.vy) < 0.001) {
+          this.x = this.tx;
+          this.y = this.ty;
+          this.vx = 0;
+          this.vy = 0;
+          this.render();
+          this.animating = false;
+          return;
+        }
+
         this.render();
         requestAnimationFrame(() => this.tick());
       }
