@@ -1,0 +1,3 @@
+## 2025-05-10 - Custom Checkbox Switch Focus State & Live Feedback
+**Learning:** Hiding native checkboxes with `opacity: 0` suppresses native browser focus rings. Sighted keyboard users lose track of focus unless `:focus-visible` on the input targets an adjacent visual sibling element (e.g., `input:focus-visible + .switch-track`). Additionally, interactive form updates in single-page demo components need `aria-live="polite"` so screen readers announce asynchronous or inline status changes immediately.
+**Action:** Always link hidden input focus states to adjacent custom control visual wrappers using `input:focus-visible + .selector`, and include polite ARIA live regions for inline form status feedback.
