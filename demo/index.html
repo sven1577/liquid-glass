@@ -58,6 +58,10 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -112,6 +116,10 @@
     border-color: rgba(255, 255, 255, 0.5);
     background: rgba(255, 255, 255, 0.13);
   }
+  .card-form input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .card-form button {
     width: 100%; margin-top: 10px; padding: 13px 16px;
     border: none; border-radius: 14px; cursor: pointer;
@@ -122,6 +130,10 @@
   .card-form button:hover {
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
+  }
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -158,6 +170,15 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .form-status {
+    margin-top: 10px; font-size: 13px; font-weight: 500;
+    color: #4cd964; min-height: 0;
+    transition: all 0.2s ease;
+  }
 </style>
 </head>
 <body>
@@ -177,9 +198,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
+    <form class="card-form" id="signup-form">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
       <button type="submit">Request invite</button>
+      <div class="form-status" role="status" aria-live="polite"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +308,23 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    document.getElementById("signup-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const statusEl = e.target.querySelector(".form-status");
+      const btn = e.target.querySelector("button");
+      btn.textContent = "Invite requested ✓";
+      btn.style.background = "rgba(76, 217, 100, 0.25)";
+      btn.style.color = "#fff";
+      statusEl.textContent = "Thanks! We've saved your spot for early access.";
+      if (window.glassCard) {
+        window.glassCard.measure();
+        window.glassCard.clampTarget();
+      }
+      if (window.glassEffect && typeof window.glassEffect.refresh === "function") {
+        window.glassEffect.refresh();
+      }
+    });
   </script>
 </body>
 </html>
