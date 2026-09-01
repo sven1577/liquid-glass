@@ -19,6 +19,9 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let uid = 0;
   let svgDefs = null;
+  // Shared offscreen canvas & context to avoid dynamic DOM allocations/GC overhead on refresh
+  let sharedCanvas = null;
+  let sharedCtx = null;
 
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
@@ -58,10 +61,15 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    // Reuse a single canvas element and 2D context to avoid GC pressure from frequent updates
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    const canvas = sharedCanvas;
+    const ctx = sharedCtx;
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext("2d");
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
