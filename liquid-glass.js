@@ -19,6 +19,10 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   let uid = 0;
   let svgDefs = null;
+  let sharedCanvas = null;
+  let sharedCtx = null;
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 20;
 
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
@@ -58,10 +62,23 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    // Cache lookup using Map-based LRU
+    const cacheKey = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(cacheKey)) {
+      const cached = mapCache.get(cacheKey);
+      mapCache.delete(cacheKey);
+      mapCache.set(cacheKey, cached);
+      return cached;
+    }
+
+    // Performance optimization: Reuse shared offscreen canvas to avoid GC allocations
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+    const ctx = sharedCtx;
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +102,14 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = sharedCanvas.toDataURL();
+    if (mapCache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    mapCache.set(cacheKey, dataUrl);
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,11 +220,21 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    let lastW = -1;
+    let lastH = -1;
+    let lastRadius = -1;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
+      // Skip redundant recalculation if element dimensions and radius are unchanged
+      if (w === lastW && h === lastH && radius === lastRadius) return;
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
+
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
