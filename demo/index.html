@@ -58,6 +58,7 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -123,6 +124,18 @@
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
   }
+  .card-form button:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
+  .form-status {
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #a3d0ff;
+    text-align: center;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
@@ -158,6 +171,9 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25), 0 0 0 2px #fff, 0 0 0 4px var(--accent);
+  }
 </style>
 </head>
 <body>
@@ -177,9 +193,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
+    <form class="card-form" id="signup-form">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
       <button type="submit">Request invite</button>
+      <div class="form-status" id="form-status" aria-live="polite"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +303,22 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    const signupForm = document.getElementById("signup-form");
+    const statusEl = document.getElementById("form-status");
+    signupForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      statusEl.textContent = "✓ Request received! Check your inbox soon.";
+      const input = signupForm.querySelector("input");
+      if (input) input.value = "";
+      if (window.glassCard) {
+        window.glassCard.measure();
+        window.glassCard.clampTarget();
+      }
+      if (window.glassEffect) {
+        window.glassEffect.refresh();
+      }
+    });
   </script>
 </body>
 </html>
