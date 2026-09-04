@@ -1,0 +1,3 @@
+## 2025-05-18 - Canvas Reuse and Displacement Map LRU Caching in SVG Filters
+**Learning:** In SVG displacement filter generation, dynamic `<canvas>` element creation and `toDataURL()` calls create significant Garbage Collection pressure and CPU overhead during frequent UI updates or animations. Reusing a module-scoped canvas/context and caching Base64 Data URIs using a Map-based bounded LRU cache eliminates DOM node allocations and costly canvas serialization.
+**Action:** Always reuse canvas/context instances for offscreen image generation and cache Data URIs by parameter signature when filter maps are regenerated repeatedly.
