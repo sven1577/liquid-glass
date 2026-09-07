@@ -58,6 +58,7 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -112,16 +113,34 @@
     border-color: rgba(255, 255, 255, 0.5);
     background: rgba(255, 255, 255, 0.13);
   }
+  .card-form input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
   .card-form button {
     width: 100%; margin-top: 10px; padding: 13px 16px;
     border: none; border-radius: 14px; cursor: pointer;
     background: var(--ink); color: #0a0a12;
     font: 600 15px/1.2 inherit; font-family: inherit;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
   }
-  .card-form button:hover {
+  .card-form button:hover:not(:disabled) {
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
+  }
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .card-form button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  .form-status {
+    margin-top: 10px; font-size: 13px; font-weight: 500; text-align: center; color: var(--accent);
+  }
+  .form-status.success {
+    color: #4cd964;
   }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -158,6 +177,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
@@ -177,14 +200,15 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
-      <button type="submit">Request invite</button>
+    <form class="card-form" id="signup-form">
+      <input type="email" id="email-input" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
+      <button type="submit" id="submit-btn">Request invite</button>
+      <div class="form-status" id="form-status" aria-live="polite"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
       <span>Send me product updates</span>
-      <input type="checkbox" checked>
+      <input type="checkbox" aria-label="Send me product updates" checked>
       <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
     </label>
   </div>
@@ -286,6 +310,34 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    // Form submission handling with accessible feedback & dynamic height adjustment
+    const signupForm = document.getElementById("signup-form");
+    const submitBtn = document.getElementById("submit-btn");
+    const formStatus = document.getElementById("form-status");
+
+    signupForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Requesting...";
+      formStatus.className = "form-status";
+      formStatus.textContent = "";
+
+      setTimeout(() => {
+        submitBtn.textContent = "Added to waitlist!";
+        formStatus.className = "form-status success";
+        formStatus.textContent = "You're on the list! Check your inbox soon.";
+
+        // Card size changed due to status text; update physics bounds and glass filter map
+        if (window.glassCard) {
+          window.glassCard.measure();
+          window.glassCard.clampTarget();
+        }
+        if (window.glassEffect && typeof window.glassEffect.refresh === "function") {
+          window.glassEffect.refresh();
+        }
+      }, 600);
+    });
   </script>
 </body>
 </html>
