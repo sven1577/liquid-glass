@@ -1,0 +1,3 @@
+## 2025-05-18 - Form Status Updates & Dynamic SVG Glass Layout Recalculation
+**Learning:** In glassmorphic card containers where dynamic content (like form submit status messages) changes the DOM height, `aria-live="polite"` handles screen reader announcements, but the SVG displacement maps and physics target bounds need explicit recalculation (`.measure()`, `.clampTarget()`, `.refresh()`) to prevent displacement map distortion or clipping errors.
+**Action:** When updating dynamic form content inside a glassmorphic element, always pair `aria-live` state updates with sequential `.measure()`, `.clampTarget()`, and `.refresh()` calls on the glass effect instances.
