@@ -1,0 +1,3 @@
+## 2025-05-18 - Canvas Reuse and Map Caching in SVG Glass Displacement
+**Learning:** Dynamic canvas allocations and `toDataURL()` serialization during continuous UI resizing or re-renders in `liquid-glass.js` create severe GC pressure and main thread lag. Reusing a single module-scoped offscreen canvas context alongside an LRU cache (capacity 50) for generated displacement map data URIs completely eliminates dynamic DOM allocations and redundant canvas rendering.
+**Action:** When working with canvas-backed SVG filters, prefer module-scoped shared offscreen canvases and parameter-keyed LRU caching for data URI generation.
