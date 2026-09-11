@@ -20,6 +20,18 @@
   let uid = 0;
   let svgDefs = null;
 
+  // Performance optimization: Reuse a single offscreen canvas and 2D context
+  // across all displacement map generations to eliminate repeated canvas element
+  // allocations and reduce GC pressure.
+  let sharedCanvas = null;
+  let sharedCtx = null;
+
+  // Performance optimization: LRU cache for generated displacement data URIs.
+  // Prevents expensive canvas rendering and canvas.toDataURL() serialization
+  // when cards/elements share standard dimensions or return to prior sizes.
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 50;
+
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
   const supported = (() => {
@@ -58,10 +70,27 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    const cacheKey = `${w}_${h}_${radius}_${border}_${mapBlur}`;
+    if (mapCache.has(cacheKey)) {
+      const cached = mapCache.get(cacheKey);
+      // Promote key to maintain LRU ordering
+      mapCache.delete(cacheKey);
+      mapCache.set(cacheKey, cached);
+      return cached;
+    }
+
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+    const ctx = sharedCtx;
+
+    // Reset composite operation and filter before drawing
+    ctx.globalCompositeOperation = "source-over";
+    ctx.filter = "none";
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +114,17 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = sharedCanvas.toDataURL();
+
+    // Cache generated displacement map
+    mapCache.set(cacheKey, dataUrl);
+    if (mapCache.size > MAX_CACHE_SIZE) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,14 +235,37 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    // Performance optimization: Cache last-measured dimensions & radius on the instance
+    // to bypass redundant map lookups and DOM updates when refresh() is triggered with unchanged dimensions.
+    let lastW = -1;
+    let lastH = -1;
+    let lastRadius = -1;
+    let lastHref = null;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
-      parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
-      parts.feImage.setAttribute("width", w);
-      parts.feImage.setAttribute("height", h);
+
+      if (w === lastW && h === lastH && radius === lastRadius) {
+        return;
+      }
+
+      const href = makeMap(w, h, radius, o.border, o.mapBlur);
+      if (href !== lastHref) {
+        parts.feImage.setAttribute("href", href);
+        lastHref = href;
+      }
+      if (w !== lastW) {
+        parts.feImage.setAttribute("width", w);
+        lastW = w;
+      }
+      if (h !== lastH) {
+        parts.feImage.setAttribute("height", h);
+        lastH = h;
+      }
+      lastRadius = radius;
     }
 
     refresh();
