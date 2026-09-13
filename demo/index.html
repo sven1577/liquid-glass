@@ -74,6 +74,15 @@
       inset 0 0 0 1px rgba(255, 255, 255, 0.13);
     cursor: grab; touch-action: none;
     will-change: transform;
+    outline: none;
+  }
+  .glass-card:focus-visible {
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.45),
+      inset 0 1px 1px rgba(255, 255, 255, 0.5),
+      inset 0 -8px 20px rgba(255, 255, 255, 0.06),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.13),
+      0 0 0 3px rgba(77, 159, 255, 0.7);
   }
   .glass-card:active { cursor: grabbing; }
   /* cursor-tracked glare */
@@ -170,7 +179,7 @@
     <a class="cta" href="https://github.com/deepika-builds/liquid-glass">Get the file</a>
   </main>
 
-  <div class="glass-card" id="card" role="group" aria-label="Early access signup">
+  <div class="glass-card" id="card" tabindex="0" role="group" aria-label="Early access signup">
     <div class="card-grip" aria-hidden="true"></div>
     <div class="card-head">
       <h2>Get early access</h2>
@@ -212,6 +221,7 @@
         el.addEventListener("pointermove", (e) => this.onMove(e));
         el.addEventListener("pointerup", (e) => this.onUp(e));
         el.addEventListener("pointercancel", (e) => this.onUp(e));
+        el.addEventListener("keydown", (e) => this.onKeyDown(e));
         window.addEventListener("resize", () => this.onResize());
 
         this.clampTarget();
@@ -255,6 +265,19 @@
 
       onResize() {
         this.measure(); // map regeneration is handled by liquid-glass.js
+        this.clampTarget();
+      }
+
+      onKeyDown(e) {
+        if (e.target !== this.el) return;
+        const step = e.shiftKey ? 40 : 10;
+        switch (e.key) {
+          case "ArrowLeft": this.tx -= step; e.preventDefault(); break;
+          case "ArrowRight": this.tx += step; e.preventDefault(); break;
+          case "ArrowUp": this.ty -= step; e.preventDefault(); break;
+          case "ArrowDown": this.ty += step; e.preventDefault(); break;
+          default: return;
+        }
         this.clampTarget();
       }
 
