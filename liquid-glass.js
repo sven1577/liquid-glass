@@ -20,6 +20,15 @@
   let uid = 0;
   let svgDefs = null;
 
+  // Bolt Optimization: Shared canvas instance to avoid dynamic canvas allocation and GC pressure.
+  let sharedCanvas = null;
+  let sharedCtx = null;
+
+  // Bolt Optimization: Bounded LRU cache (max 20 entries) for displacement map data URIs
+  // to avoid redundant, expensive canvas.toDataURL() encoding calls.
+  const mapCache = new Map();
+  const MAP_CACHE_MAX = 20;
+
   // Chromium can apply SVG filters via backdrop-filter; Safari and Firefox
   // silently no-op, so they get the frosted fallback instead.
   const supported = (() => {
@@ -58,10 +67,24 @@
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    const cacheKey = w + ":" + h + ":" + radius + ":" + border + ":" + mapBlur;
+    if (mapCache.has(cacheKey)) {
+      const cached = mapCache.get(cacheKey);
+      // Promote key to most recently used
+      mapCache.delete(cacheKey);
+      mapCache.set(cacheKey, cached);
+      return cached;
+    }
+
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+    const ctx = sharedCtx;
+
+    ctx.clearRect(0, 0, w, h);
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +108,16 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = sharedCanvas.toDataURL();
+
+    if (mapCache.size >= MAP_CACHE_MAX) {
+      const firstKey = mapCache.keys().next().value;
+      mapCache.delete(firstKey);
+    }
+    mapCache.set(cacheKey, dataUrl);
+
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,11 +228,23 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    let lastW = 0;
+    let lastH = 0;
+    let lastRadius = -1;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
+
+      // Bolt Optimization: Skip redundant map generation and SVG DOM attribute updates
+      // if dimensions and computed radius have not changed.
+      if (w === lastW && h === lastH && radius === lastRadius) return;
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
+
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
