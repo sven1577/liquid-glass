@@ -1,0 +1,3 @@
+## 2026-09-17 - Canvas Displacement Map LRU Caching and Allocation Reuse
+**Learning:** In canvas-driven SVG displacement map filters, creating new canvas DOM elements on every map render causes significant garbage collection pressure. Additionally, canvas `.toDataURL()` base64 encoding is CPU-heavy. Caching generated data URIs using a Map-based LRU cache and reusing a single shared canvas context eliminates both GC spikes and CPU rendering overhead.
+**Action:** Always reuse canvas contexts for procedural texture/map generation and cache output data URIs when input dimensions and styling parameters match.
