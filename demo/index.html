@@ -123,6 +123,13 @@
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
   }
+  .card-status {
+    margin-top: 10px; font-size: 13px; font-weight: 500;
+    color: #86efac; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    opacity: 0; transition: opacity 0.2s ease;
+    display: none;
+  }
+  .card-status.visible { opacity: 1; display: block; }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
@@ -177,9 +184,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
+    <form class="card-form" id="signup-form">
+      <input type="email" name="email" id="signup-email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
       <button type="submit">Request invite</button>
+      <p id="form-status" class="card-status" aria-live="polite"></p>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +294,25 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    document.getElementById("signup-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const emailInput = document.getElementById("signup-email");
+      const statusMsg = document.getElementById("form-status");
+      if (!emailInput.value.trim()) return;
+
+      statusMsg.textContent = "✓ You're on the list! We'll be in touch soon.";
+      statusMsg.classList.add("visible");
+      emailInput.value = "";
+
+      if (window.glassCard) {
+        window.glassCard.measure();
+        window.glassCard.clampTarget();
+      }
+      if (window.glassEffect && typeof window.glassEffect.refresh === "function") {
+        window.glassEffect.refresh();
+      }
+    });
   </script>
 </body>
 </html>
