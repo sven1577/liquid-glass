@@ -112,16 +112,30 @@
     border-color: rgba(255, 255, 255, 0.5);
     background: rgba(255, 255, 255, 0.13);
   }
+  .card-form input:focus-visible,
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .card-form button {
     width: 100%; margin-top: 10px; padding: 13px 16px;
     border: none; border-radius: 14px; cursor: pointer;
     background: var(--ink); color: #0a0a12;
     font: 600 15px/1.2 inherit; font-family: inherit;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
   }
-  .card-form button:hover {
+  .card-form button:hover:not(:disabled) {
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
+  }
+  .card-form button:disabled {
+    opacity: 0.75;
+    cursor: not-allowed;
+  }
+  .form-status {
+    margin-top: 8px; font-size: 13px; font-weight: 500;
+    color: rgba(255, 255, 255, 0.9); text-align: center;
+    min-height: 18px;
   }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -158,6 +172,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
@@ -177,9 +195,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
-      <button type="submit">Request invite</button>
+    <form class="card-form" id="signup-form">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
+      <button type="submit" id="submit-btn">Request invite</button>
+      <div id="form-status" class="form-status" aria-live="polite"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +305,29 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    const signupForm = document.getElementById("signup-form");
+    if (signupForm) {
+      signupForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const input = signupForm.querySelector("input[type='email']");
+        const btn = document.getElementById("submit-btn");
+        const status = document.getElementById("form-status");
+        if (!input.value.trim()) return;
+
+        btn.disabled = true;
+        const originalText = btn.textContent;
+        btn.textContent = "✓ Invited!";
+        status.textContent = "You're on the list!";
+        input.value = "";
+
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = originalText;
+          status.textContent = "";
+        }, 3500);
+      });
+    }
   </script>
 </body>
 </html>
