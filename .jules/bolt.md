@@ -1,0 +1,3 @@
+## 2025-03-08 - Shared Offscreen Canvas and Data URI LRU Caching for SVG Displacement Maps
+**Learning:** Generating SVG displacement maps dynamically creates high dynamic memory / GC pressure when allocating `<canvas>` DOM nodes per call and high CPU cost on `canvas.toDataURL()`. In animation loops or resize events, caching rendered data URIs in an LRU Map keyed by dimensions and border-radius eliminates redundant `toDataURL()` calls, while a shared module-level canvas prevents continuous allocation/deallocation of canvas DOM nodes.
+**Action:** Always reuse a shared canvas context and implement LRU caching for generated data URIs in canvas-based dynamic texture/map generators.
