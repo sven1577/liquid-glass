@@ -214,10 +214,18 @@
         el.addEventListener("pointercancel", (e) => this.onUp(e));
         window.addEventListener("resize", () => this.onResize());
 
+        this.animating = false;
         this.clampTarget();
         this.x = this.tx; this.y = this.ty;
         this.render();
-        requestAnimationFrame(() => this.tick());
+        this.startLoop();
+      }
+
+      startLoop() {
+        if (!this.animating) {
+          this.animating = true;
+          requestAnimationFrame(() => this.tick());
+        }
       }
 
       measure() {
@@ -231,6 +239,7 @@
         this.dragging = true;
         this.grabDX = e.clientX - this.tx;
         this.grabDY = e.clientY - this.ty;
+        this.startLoop();
         try { this.el.setPointerCapture(e.pointerId); } catch (_) { /* synthetic pointer */ }
       }
 
@@ -244,6 +253,7 @@
         this.tx = e.clientX - this.grabDX;
         this.ty = e.clientY - this.grabDY;
         this.clampTarget();
+        this.startLoop();
       }
 
       onUp(e) {
@@ -256,6 +266,7 @@
       onResize() {
         this.measure(); // map regeneration is handled by liquid-glass.js
         this.clampTarget();
+        this.startLoop();
       }
 
       clampTarget() {
@@ -269,6 +280,26 @@
         this.vy = (this.vy + (this.ty - this.y) * this.stiffness) * this.damping;
         this.x += this.vx;
         this.y += this.vy;
+
+        // Optimization: Pause the requestAnimationFrame loop when motion settles below threshold
+        // to save CPU/GPU cycles and battery life when idle.
+        const settlementThreshold = 0.005;
+        if (
+          !this.dragging &&
+          Math.abs(this.vx) < settlementThreshold &&
+          Math.abs(this.vy) < settlementThreshold &&
+          Math.abs(this.tx - this.x) < settlementThreshold &&
+          Math.abs(this.ty - this.y) < settlementThreshold
+        ) {
+          this.x = this.tx;
+          this.y = this.ty;
+          this.vx = 0;
+          this.vy = 0;
+          this.animating = false;
+          this.render();
+          return;
+        }
+
         this.render();
         requestAnimationFrame(() => this.tick());
       }

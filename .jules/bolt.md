@@ -1,0 +1,3 @@
+## 2026-07-09 - Spring Physics Idle Settlement
+**Learning:** In spring physics loops driven by `requestAnimationFrame`, residual displacement and tiny floating point velocity oscillation can keep the animation loop running indefinitely in the background even when the element appears completely still, unnecessarily consuming CPU/GPU and battery power.
+**Action:** Always include a settlement threshold (e.g., `0.005`) that checks both velocity (`|vx|`, `|vy|`) and target displacement (`|tx - x|`, `|ty - y|`) when `dragging` is false, snapping coordinates to target and pausing the `requestAnimationFrame` loop when idle.
