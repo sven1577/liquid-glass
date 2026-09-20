@@ -158,6 +158,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
@@ -183,8 +187,8 @@
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
-      <span>Send me product updates</span>
-      <input type="checkbox" checked>
+      <span id="updates-label">Send me product updates</span>
+      <input type="checkbox" checked aria-labelledby="updates-label">
       <span class="switch-track" aria-hidden="true"><span class="switch-thumb"></span></span>
     </label>
   </div>
