@@ -1,0 +1,3 @@
+## 2025-05-20 - Canvas Displacement Map Allocation and Caching in SVG Filters
+**Learning:** In client-side SVG filter refraction techniques (`feImage`), generating displacement maps on-demand via `canvas.toDataURL()` incurs severe GC pressure and main thread stalls if a new `<canvas>` element is instantiated on every `refresh()`. Reusing a shared 2D canvas context and memoizing data URIs in a bounded Map LRU cache eliminates DOM/GC overhead and CPU rendering time across duplicate dimensions.
+**Action:** When working with canvas-backed SVG filters, reuse shared canvas instances and cache serialized Data URIs by parameter signature.
