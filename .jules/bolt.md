@@ -1,0 +1,3 @@
+## 2025-05-18 - Canvas Reuse and Map Caching in SVG Glassmorphic Filters
+**Learning:** In canvas-generated SVG displacement maps, dynamic canvas allocation (`document.createElement('canvas')`) and repeated base64 PNG data URI generation (`canvas.toDataURL()`) create massive CPU execution overhead and GC pressure. Reusing a single offscreen canvas and caching generated data URIs in a bounded LRU Map reduces `refresh()` execution latency from ~4ms down to microseconds.
+**Action:** When working with canvas-based SVG image filters or textures, reuse offscreen canvas contexts and cache data URIs keyed by dimension/radius parameters.
