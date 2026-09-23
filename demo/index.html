@@ -58,6 +58,12 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible,
+  .card-form input:focus-visible,
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -158,6 +164,18 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .card-status {
+    margin-top: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    min-height: 18px;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -177,9 +195,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
+    <form class="card-form" id="cardForm">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
       <button type="submit">Request invite</button>
+      <div class="card-status" id="cardStatus" aria-live="polite"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +305,24 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    const cardForm = document.getElementById("cardForm");
+    const cardStatus = document.getElementById("cardStatus");
+    if (cardForm) {
+      cardForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const btn = cardForm.querySelector("button");
+        const originalText = btn.textContent;
+        btn.textContent = "✓ Requested!";
+        btn.disabled = true;
+        cardStatus.textContent = "You're on the early access list!";
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.disabled = false;
+          cardStatus.textContent = "";
+        }, 3000);
+      });
+    }
   </script>
 </body>
 </html>
