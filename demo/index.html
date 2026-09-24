@@ -58,6 +58,12 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible,
+  .card-form input:focus-visible,
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -158,6 +164,15 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+  }
+  .form-status {
+    margin-top: 10px; font-size: 13px; font-weight: 500;
+    color: #4dff91; text-align: center; display: none;
+    line-height: 1.4;
+  }
+  .form-status.visible { display: block; }
 </style>
 </head>
 <body>
@@ -177,9 +192,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
-      <button type="submit">Request invite</button>
+    <form class="card-form" id="signup-form">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
+      <button type="submit" id="submit-btn">Request invite</button>
+      <p id="form-status" class="form-status" aria-live="polite"></p>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +302,26 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    // Form feedback handler
+    const signupForm = document.getElementById("signup-form");
+    const submitBtn = document.getElementById("submit-btn");
+    const formStatus = document.getElementById("form-status");
+
+    signupForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      submitBtn.textContent = "Requested ✓";
+      submitBtn.disabled = true;
+      formStatus.textContent = "You're on the list! We'll be in touch soon.";
+      formStatus.classList.add("visible");
+      if (window.glassCard) {
+        window.glassCard.measure();
+        window.glassCard.clampTarget();
+      }
+      if (window.glassEffect) {
+        window.glassEffect.refresh();
+      }
+    });
   </script>
 </body>
 </html>
