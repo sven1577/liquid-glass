@@ -1,0 +1,3 @@
+## 2025-02-14 - Inline Form Status and Custom Focus Ring Accessibility
+**Learning:** In glassmorphic and custom UI card components with dynamic DOM updates, inline feedback requires an `aria-live="polite"` region for screen readers, as well as explicit layout recalculations (`.measure()`, `.clampTarget()`, `.refresh()`) when content expansion alters container dimensions. Custom toggle switch inputs that hide checkboxes must also use `input:focus-visible + .switch-track` to maintain keyboard focus visibility.
+**Action:** Always include polite live regions for interactive updates and leverage `:focus-visible` sibling selectors for custom input controls.
