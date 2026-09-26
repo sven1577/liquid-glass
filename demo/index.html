@@ -207,6 +207,7 @@
         this.grabDX = 0; this.grabDY = 0;
         this.stiffness = 0.12;
         this.damping = 0.72;
+        this.animating = false;
 
         el.addEventListener("pointerdown", (e) => this.onDown(e));
         el.addEventListener("pointermove", (e) => this.onMove(e));
@@ -217,12 +218,19 @@
         this.clampTarget();
         this.x = this.tx; this.y = this.ty;
         this.render();
-        requestAnimationFrame(() => this.tick());
+        this.wake();
       }
 
       measure() {
         this.w = this.el.offsetWidth;
         this.h = this.el.offsetHeight;
+      }
+
+      wake() {
+        if (!this.animating) {
+          this.animating = true;
+          requestAnimationFrame(() => this.tick());
+        }
       }
 
       onDown(e) {
@@ -231,6 +239,7 @@
         this.dragging = true;
         this.grabDX = e.clientX - this.tx;
         this.grabDY = e.clientY - this.ty;
+        this.wake();
         try { this.el.setPointerCapture(e.pointerId); } catch (_) { /* synthetic pointer */ }
       }
 
@@ -262,15 +271,28 @@
         const m = 12;
         this.tx = Math.min(Math.max(this.tx, m), window.innerWidth - this.w - m);
         this.ty = Math.min(Math.max(this.ty, m), window.innerHeight - this.h - m);
+        this.wake();
       }
 
       tick() {
+        if (!this.animating) return;
         this.vx = (this.vx + (this.tx - this.x) * this.stiffness) * this.damping;
         this.vy = (this.vy + (this.ty - this.y) * this.stiffness) * this.damping;
         this.x += this.vx;
         this.y += this.vy;
         this.render();
-        requestAnimationFrame(() => this.tick());
+
+        // Pause animation when velocity and displacement are below settlement threshold
+        if (Math.hypot(this.vx, this.vy) < 0.005 && Math.hypot(this.tx - this.x, this.ty - this.y) < 0.005) {
+          this.x = this.tx;
+          this.y = this.ty;
+          this.vx = 0;
+          this.vy = 0;
+          this.render();
+          this.animating = false;
+        } else {
+          requestAnimationFrame(() => this.tick());
+        }
       }
 
       render() {
