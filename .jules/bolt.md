@@ -1,0 +1,3 @@
+## 2026-09-28 - SVG Filter Data URI & Offscreen Canvas Optimization
+**Learning:** Generating displacement maps dynamically using dynamic HTMLCanvasElement allocations and `toDataURL()` calls introduces significant GC pressure and CPU usage during element resizing or repositioning. Reusing a shared offscreen canvas/context and caching displacement map Data URIs in a bounded LRU cache eliminates allocation overhead and string serialization.
+**Action:** Always reuse canvas contexts for procedural texture generation and cache data URI outputs indexed by parameters (width, height, radius, refraction, edge depth). Short-circuit updates when input dimensions remain identical.
