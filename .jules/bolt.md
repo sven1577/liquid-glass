@@ -1,0 +1,3 @@
+## 2025-05-18 - Canvas Allocation & Data URL Caching in SVG Filters
+**Learning:** Dynamic canvas creation during interactive physics loops causes high GC pressure, and `canvas.toDataURL()` calls consume significant CPU time. Invalidation risks make caching computed styles in persistent WeakMaps dangerous, but caching generated displacement data URIs in a bounded LRU cache combined with reusing a shared canvas context safely eliminates redundant work.
+**Action:** Always reuse a shared offscreen canvas and cache deterministic generator outputs (Data URIs) using bounded LRU caches before doing costly DOM or data operations in animation loops.
