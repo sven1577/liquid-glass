@@ -52,16 +52,42 @@
     return svgDefs;
   }
 
+  // Performance optimizations (⚡ Bolt):
+  // 1. Re-use a single offscreen canvas context to avoid dynamic DOM allocation & GC overhead.
+  // 2. Cache displacement map Data URLs in a bounded LRU cache to skip expensive 2D canvas ops & toDataURL().
+  let sharedCanvas = null;
+  let sharedCtx = null;
+  const MAP_CACHE_MAX_SIZE = 50;
+  const mapCache = new Map();
+
+  function getSharedCanvas() {
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    return { canvas: sharedCanvas, ctx: sharedCtx };
+  }
+
   // Displacement map, gradient-difference method: a red left->right ramp
   // encodes X displacement, a blue top->bottom ramp encodes Y ("difference"
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+    const key = `${w}_${h}_${radius.toFixed(2)}_${border}_${mapBlur}`;
+    if (mapCache.has(key)) {
+      const cached = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, cached);
+      return cached;
+    }
+
+    const { canvas, ctx } = getSharedCanvas();
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext("2d");
+
+    ctx.globalCompositeOperation = "source-over";
+    ctx.filter = "none";
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +111,14 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = canvas.toDataURL();
+    if (mapCache.size >= MAP_CACHE_MAX_SIZE) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    mapCache.set(key, dataUrl);
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,11 +229,24 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
-    function refresh() {
+    // Performance optimization (⚡ Bolt): cache dimensions on instance to skip redundant DOM updates
+    let lastW = 0;
+    let lastH = 0;
+    let lastRadius = -1;
+
+    function refresh(force) {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
+
+      if (!force && w === lastW && h === lastH && radius === lastRadius) {
+        return;
+      }
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
+
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
