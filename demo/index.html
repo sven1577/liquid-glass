@@ -58,6 +58,7 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -123,6 +124,21 @@
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
   }
+  .card-form input:focus-visible,
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .card-status {
+    margin-top: 10px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink);
+    min-height: 18px;
+    transition: opacity 0.2s ease;
+  }
+  .card-status.error { color: #ff6b6b; }
+  .card-status.success { color: #51cf66; }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
@@ -158,6 +174,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
 </style>
 </head>
 <body>
@@ -177,9 +197,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
+    <form class="card-form" id="invite-form" novalidate>
+      <input type="email" id="email-input" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
       <button type="submit">Request invite</button>
+      <div class="card-status" id="form-status" aria-live="polite"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +307,30 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    // Form feedback with dynamic recalculation for glass card size change
+    const form = document.getElementById("invite-form");
+    const emailInput = document.getElementById("email-input");
+    const statusEl = document.getElementById("form-status");
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const value = emailInput.value.trim();
+      if (!value || !value.includes("@") || !value.includes(".")) {
+        statusEl.textContent = "Please enter a valid email address.";
+        statusEl.className = "card-status error";
+      } else {
+        statusEl.textContent = "Thanks! You're on the list.";
+        statusEl.className = "card-status success";
+        emailInput.value = "";
+      }
+      // Trigger dynamic recalculations for card layout updates
+      if (window.glassCard && window.glassEffect) {
+        window.glassCard.measure();
+        window.glassCard.clampTarget();
+        window.glassEffect.refresh();
+      }
+    });
   </script>
 </body>
 </html>
