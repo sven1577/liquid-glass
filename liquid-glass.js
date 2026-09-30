@@ -52,16 +52,39 @@
     return svgDefs;
   }
 
+  // Shared canvas for displacement map generation to eliminate GC allocation overhead
+  let sharedCanvas = null;
+  let sharedCtx = null;
+
+  // Bounded LRU cache for generated displacement data URIs to avoid redundant canvas renders and CPU-heavy toDataURL() calls
+  const mapCache = new Map();
+  const MAP_CACHE_LIMIT = 20;
+
+  function getSharedContext(w, h) {
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+    return sharedCtx;
+  }
+
   // Displacement map, gradient-difference method: a red left->right ramp
   // encodes X displacement, a blue top->bottom ramp encodes Y ("difference"
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    const cacheKey = `${w}_${h}_${radius}_${border}_${mapBlur}`;
+    if (mapCache.has(cacheKey)) {
+      const cached = mapCache.get(cacheKey);
+      mapCache.delete(cacheKey);
+      mapCache.set(cacheKey, cached);
+      return cached;
+    }
+
+    const ctx = getSharedContext(w, h);
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +108,14 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const dataUrl = sharedCanvas.toDataURL();
+    if (mapCache.size >= MAP_CACHE_LIMIT) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    mapCache.set(cacheKey, dataUrl);
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,11 +226,20 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    // Track last measured values to bypass redundant DOM updates on refresh
+    let lastW = 0;
+    let lastH = 0;
+    let lastRadius = -1;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
+      if (w === lastW && h === lastH && radius === lastRadius) return;
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
