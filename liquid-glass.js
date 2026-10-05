@@ -52,16 +52,35 @@
     return svgDefs;
   }
 
+  // Shared canvas and LRU cache for displacement maps to eliminate GC pressure
+  // and CPU-intensive canvas draw / toDataURL calls during window resizes and re-renders.
+  let sharedCanvas = null;
+  let sharedCtx = null;
+  const mapCache = new Map();
+  const MAX_CACHE_SIZE = 20;
+
   // Displacement map, gradient-difference method: a red left->right ramp
   // encodes X displacement, a blue top->bottom ramp encodes Y ("difference"
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      const cached = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, cached);
+      return cached;
+    }
+
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+    const ctx = sharedCtx;
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -85,7 +104,16 @@
                   Math.max(radius - inset, 2));
     ctx.fill();
     ctx.filter = "none";
-    return canvas.toDataURL();
+
+    const url = sharedCanvas.toDataURL();
+
+    if (mapCache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    mapCache.set(key, url);
+
+    return url;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,12 +224,16 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    let lastUrl = null;
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
-      parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
+      const url = makeMap(w, h, radius, o.border, o.mapBlur);
+      if (url === lastUrl) return;
+      lastUrl = url;
+      parts.feImage.setAttribute("href", url);
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
     }
