@@ -158,6 +158,30 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+
+  /* Focus visible accessibility states */
+  .hero .cta:focus-visible,
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .card-form input:focus-visible {
+    border-color: rgba(255, 255, 255, 0.5);
+    outline: 2px solid var(--accent);
+    outline-offset: -1px;
+  }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .form-status {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 500;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -177,9 +201,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
-      <button type="submit">Request invite</button>
+    <form class="card-form" id="invite-form">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
+      <button type="submit" id="submit-btn">Request invite</button>
+      <div class="form-status" id="form-status" aria-live="polite"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +311,19 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    document.getElementById("invite-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("submit-btn");
+      const status = document.getElementById("form-status");
+      btn.disabled = true;
+      btn.style.opacity = "0.75";
+      btn.textContent = "✓ You're on the list!";
+      status.textContent = "Thanks! We've saved your request.";
+      window.glassCard.measure();
+      window.glassCard.clampTarget();
+      window.glassEffect.refresh();
+    });
   </script>
 </body>
 </html>
