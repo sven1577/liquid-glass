@@ -52,16 +52,34 @@
     return svgDefs;
   }
 
+  // Shared canvas instance to avoid GC allocation overhead on every map render
+  let sharedCanvas = null;
+  let sharedCtx = null;
+
+  // Bounded LRU cache for generated displacement map Data URIs to eliminate
+  // costly synchronous canvas.toDataURL() encoding when parameters repeat.
+  const MAP_CACHE_MAX = 32;
+  const mapCache = new Map();
+
+  function getSharedCanvas() {
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    return { canvas: sharedCanvas, ctx: sharedCtx };
+  }
+
   // Displacement map, gradient-difference method: a red left->right ramp
   // encodes X displacement, a blue top->bottom ramp encodes Y ("difference"
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
-  function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
+  function renderMap(w, h, radius, border, mapBlur) {
+    const { canvas, ctx } = getSharedCanvas();
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext("2d");
+
+    ctx.globalCompositeOperation = "source-over";
 
     const gx = ctx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
@@ -86,6 +104,23 @@
     ctx.fill();
     ctx.filter = "none";
     return canvas.toDataURL();
+  }
+
+  function makeMap(w, h, radius, border, mapBlur) {
+    const key = w + "_" + h + "_" + radius + "_" + border + "_" + mapBlur;
+    if (mapCache.has(key)) {
+      const cached = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, cached);
+      return cached;
+    }
+    const dataUrl = renderMap(w, h, radius, border, mapBlur);
+    if (mapCache.size >= MAP_CACHE_MAX) {
+      const firstKey = mapCache.keys().next().value;
+      mapCache.delete(firstKey);
+    }
+    mapCache.set(key, dataUrl);
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,11 +231,21 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    let lastW = 0;
+    let lastH = 0;
+    let lastRadius = -1;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
+      // Skip redundant map generation and DOM attribute updates if element geometry hasn't changed
+      if (w === lastW && h === lastH && radius === lastRadius) return;
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
+
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
