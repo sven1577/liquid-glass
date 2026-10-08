@@ -1,0 +1,3 @@
+## 2026-10-08 - Offscreen Canvas & Displacement Map Caching in liquid-glass.js
+**Learning:** Generating SVG displacement maps dynamically creates high GC pressure from DOM `<canvas>` allocations and CPU overhead from `canvas.toDataURL()` on every resize/refresh. Reusing a single shared offscreen canvas and caching generated data URLs in a bounded Map LRU eliminates allocation spikes and makes map retrieval instantaneous for identical dimensions/parameters.
+**Action:** Always reuse a module-scoped canvas instance and cache serialized Data URLs when building procedural canvas-to-SVG displacement maps.
