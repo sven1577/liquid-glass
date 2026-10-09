@@ -1,0 +1,3 @@
+## 2025-05-18 - Canvas Allocation and Data URI Caching in liquid-glass.js
+**Learning:** Generating SVG displacement maps dynamically with dynamic HTML5 `<canvas>` elements and `canvas.toDataURL()` on every render causes significant GC pressure and CPU bottlenecks. Furthermore, persistent WeakMap style caching for computed `border-radius` carries cache invalidation risks when element styles change dynamically.
+**Action:** Reuse a single module-level offscreen canvas element and maintain a Map-based bounded LRU cache (keying on width, height, and border radius) for generated data URIs, while caching last-measured dimensions on instance objects to bypass redundant recalculations.
