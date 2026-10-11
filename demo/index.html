@@ -158,6 +158,19 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  .card-status {
+    margin-top: 10px; font-size: 13px; font-weight: 500;
+    color: #8be0a4; text-align: center; min-height: 18px;
+  }
 </style>
 </head>
 <body>
@@ -177,10 +190,11 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
-      <button type="submit">Request invite</button>
+    <form class="card-form" id="signup-form">
+      <input type="email" name="email" id="email-input" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
+      <button type="submit" id="submit-btn">Request invite</button>
     </form>
+    <div id="card-status" class="card-status" aria-live="polite"></div>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
       <span>Send me product updates</span>
@@ -286,6 +300,33 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    const form = document.getElementById("signup-form");
+    const emailInput = document.getElementById("email-input");
+    const submitBtn = document.getElementById("submit-btn");
+    const statusDiv = document.getElementById("card-status");
+
+    if (form) {
+      form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!emailInput.value.trim()) return;
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Requesting...";
+
+        setTimeout(() => {
+          submitBtn.textContent = "✓ Requested";
+          statusDiv.textContent = "You're on the list! We'll be in touch.";
+
+          setTimeout(() => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Request invite";
+            statusDiv.textContent = "";
+            emailInput.value = "";
+          }, 3000);
+        }, 400);
+      });
+    }
   </script>
 </body>
 </html>
