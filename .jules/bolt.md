@@ -1,0 +1,3 @@
+## 2026-10-15 - Shared Canvas & Map Data Cache for SVG Displacement Maps
+**Learning:** Generating displacement maps via dynamic `canvas` creation and `canvas.toDataURL()` on every element refresh or window resize introduces severe GC pressure and heavy main-thread CPU overhead. Reusing a single shared offscreen canvas along with a Map-based LRU cache for data URLs drastically cuts canvas creation and serialization cost.
+**Action:** Always reuse canvas/context instances for transient rendering tasks and cache data URL outputs when parameters (dimensions, radius, blur) are discrete and frequently repeated across component instances or resizes.
