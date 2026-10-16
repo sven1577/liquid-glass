@@ -58,6 +58,7 @@
     text-decoration: none; transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .hero .cta:hover { transform: scale(1.04); box-shadow: 0 8px 32px rgba(255,255,255,0.25); }
+  .hero .cta:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 
   /* ---- Glass card ---- */
   .glass-card {
@@ -123,6 +124,10 @@
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
   }
+  .card-form button:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
@@ -158,6 +163,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
