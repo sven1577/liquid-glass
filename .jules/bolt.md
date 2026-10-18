@@ -1,0 +1,3 @@
+## 2025-05-18 - Canvas Data URI Generation & Instance Dimension Caching in SVG Filters
+**Learning:** In dynamic SVG filter glassmorphism effects, generating displacement maps via `HTMLCanvasElement.toDataURL()` on every update causes significant CPU serialization overhead and garbage collection pressure due to temporary canvas allocations. Furthermore, `ResizeObserver` callbacks or periodic refresh triggers can invoke map generation even when element dimensions haven't changed.
+**Action:** Always reuse a module-level shared canvas, cache generated data URIs in a bounded Map LRU cache keyed by render parameters, and cache element width/height/radius on component instances to exit early when dimensions are unchanged.
