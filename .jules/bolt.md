@@ -1,0 +1,3 @@
+## 2025-05-18 - Dynamic canvas allocation and toDataURL caching in liquid-glass
+**Learning:** Creating dynamic `<canvas>` elements and calling `canvas.toDataURL()` on every displacement map refresh causes significant GC pressure and CPU overhead during layout changes or repeated component initialization. Reusing a shared canvas context and caching generated data URIs in a Map-based LRU cache eliminates redundant canvas draws and base64 PNG encoding.
+**Action:** Always reuse canvas contexts when rendering procedural texture/displacement maps in runtime JS libraries, and cache generated data URLs based on input map dimensions and parameters.
