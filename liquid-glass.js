@@ -52,40 +52,65 @@
     return svgDefs;
   }
 
+  // Shared canvas and context to eliminate GC pressure from repeated allocations
+  let sharedCanvas = null;
+  let sharedCtx = null;
+
+  // Bounded LRU cache for generated displacement map data URIs
+  const mapCache = new Map();
+  const MAP_CACHE_LIMIT = 20;
+
   // Displacement map, gradient-difference method: a red left->right ramp
   // encodes X displacement, a blue top->bottom ramp encodes Y ("difference"
   // keeps both since the channels are disjoint). A blurred, inset 50%-gray
   // rounded rect neutralizes the interior, confining the refraction bulge to
   // an edge band whose curvature is set by the blur radius.
   function makeMap(w, h, radius, border, mapBlur) {
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
+    const key = `${w}_${h}_${radius}_${border}_${mapBlur}`;
+    if (mapCache.has(key)) {
+      const dataUrl = mapCache.get(key);
+      mapCache.delete(key);
+      mapCache.set(key, dataUrl);
+      return dataUrl;
+    }
 
-    const gx = ctx.createLinearGradient(0, 0, w, 0);
+    if (!sharedCanvas) {
+      sharedCanvas = document.createElement("canvas");
+      sharedCtx = sharedCanvas.getContext("2d");
+    }
+    sharedCanvas.width = w;
+    sharedCanvas.height = h;
+
+    const gx = sharedCtx.createLinearGradient(0, 0, w, 0);
     gx.addColorStop(0, "rgb(0,0,0)");
     gx.addColorStop(1, "rgb(255,0,0)");
-    ctx.fillStyle = gx;
-    ctx.fillRect(0, 0, w, h);
+    sharedCtx.fillStyle = gx;
+    sharedCtx.fillRect(0, 0, w, h);
 
-    const gy = ctx.createLinearGradient(0, 0, 0, h);
+    const gy = sharedCtx.createLinearGradient(0, 0, 0, h);
     gy.addColorStop(0, "rgb(0,0,0)");
     gy.addColorStop(1, "rgb(0,0,255)");
-    ctx.globalCompositeOperation = "difference";
-    ctx.fillStyle = gy;
-    ctx.fillRect(0, 0, w, h);
+    sharedCtx.globalCompositeOperation = "difference";
+    sharedCtx.fillStyle = gy;
+    sharedCtx.fillRect(0, 0, w, h);
 
-    ctx.globalCompositeOperation = "source-over";
+    sharedCtx.globalCompositeOperation = "source-over";
     const inset = border * Math.min(w, h);
-    ctx.filter = "blur(" + mapBlur + "px)";
-    ctx.fillStyle = "rgba(128,128,128,0.93)";
-    ctx.beginPath();
-    ctx.roundRect(inset, inset, w - inset * 2, h - inset * 2,
+    sharedCtx.filter = "blur(" + mapBlur + "px)";
+    sharedCtx.fillStyle = "rgba(128,128,128,0.93)";
+    sharedCtx.beginPath();
+    sharedCtx.roundRect(inset, inset, w - inset * 2, h - inset * 2,
                   Math.max(radius - inset, 2));
-    ctx.fill();
-    ctx.filter = "none";
-    return canvas.toDataURL();
+    sharedCtx.fill();
+    sharedCtx.filter = "none";
+
+    const dataUrl = sharedCanvas.toDataURL();
+    if (mapCache.size >= MAP_CACHE_LIMIT) {
+      const oldestKey = mapCache.keys().next().value;
+      mapCache.delete(oldestKey);
+    }
+    mapCache.set(key, dataUrl);
+    return dataUrl;
   }
 
   // Three displacement passes at staggered scales (R strongest), channels
@@ -196,11 +221,19 @@
     const scales = [o.scale, o.scale + o.chroma, o.scale + 2 * o.chroma];
     const parts = buildFilter(id, scales);
 
+    let lastW = 0;
+    let lastH = 0;
+    let lastRadius = -1;
+
     function refresh() {
       const w = el.offsetWidth;
       const h = el.offsetHeight;
       if (!w || !h) return;
       const radius = resolveRadius(el, w, h, o.radius);
+      if (w === lastW && h === lastH && radius === lastRadius) return;
+      lastW = w;
+      lastH = h;
+      lastRadius = radius;
       parts.feImage.setAttribute("href", makeMap(w, h, radius, o.border, o.mapBlur));
       parts.feImage.setAttribute("width", w);
       parts.feImage.setAttribute("height", h);
