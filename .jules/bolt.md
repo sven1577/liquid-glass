@@ -1,0 +1,3 @@
+## 2025-05-18 - Canvas Reuse and Data URI LRU Caching for SVG Displacement Maps
+**Learning:** Generating SVG displacement maps via `canvas.toDataURL()` on every `refresh()` creates heavy CPU serialization costs (~11-20ms) and dynamic canvas GC pressure. Caching Data URIs in a bounded LRU cache indexed by element dimensions (`width,height,radius`) and reusing a module-level canvas eliminates allocation and serialization overhead on repeated renders.
+**Action:** When working with dynamically rendered canvas-based SVG filter Data URIs, always reuse canvas contexts and implement Map-based bounded LRU caching keying off distinct shape dimensions.
