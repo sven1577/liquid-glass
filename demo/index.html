@@ -123,6 +123,14 @@
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
   }
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+  }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
@@ -158,6 +166,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
@@ -177,9 +189,10 @@
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
+    <form class="card-form" id="signup-form">
+      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
       <button type="submit">Request invite</button>
+      <span class="sr-only" aria-live="polite" id="form-status"></span>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -286,6 +299,27 @@
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    const signupForm = document.getElementById("signup-form");
+    if (signupForm) {
+      const btn = signupForm.querySelector("button");
+      const input = signupForm.querySelector("input");
+      const status = document.getElementById("form-status");
+      signupForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (!input.value.trim()) return;
+        const originalText = btn.textContent;
+        btn.textContent = "Invite requested! ✓";
+        btn.disabled = true;
+        if (status) status.textContent = "Invite requested successfully.";
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.disabled = false;
+          if (status) status.textContent = "";
+          input.value = "";
+        }, 2500);
+      });
+    }
   </script>
 </body>
 </html>
