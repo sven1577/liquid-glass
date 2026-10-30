@@ -1,0 +1,3 @@
+## 2025-05-18 - Glassmorphic Container Dynamic Recalculation on Form State Changes
+**Learning:** Dynamic DOM updates (such as revealing inline validation/status feedback or changing button dimensions upon submission) inside glassmorphic card containers alter element height and layout. Without explicit recalculations, the glass displacement background map remains statically sized, leading to alignment and clipping artifacts.
+**Action:** Sequentially invoke `.measure()`, `.clampTarget()`, and `.refresh()` on active `LiquidGlass` and `GlassCard` instances whenever internal UI state transitions resize glass container elements.
