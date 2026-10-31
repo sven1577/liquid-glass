@@ -1,0 +1,3 @@
+## 2026-10-31 - Keyboard Navigation on Draggable Widgets
+**Learning:** Custom interactive container elements with pointer drag support often exclude keyboard-only and screen reader users. Simply making the container focusable via `tabindex="0"` and binding `keydown` handlers is not enough; handlers MUST check `if (e.target !== containerElement) return;` so child elements (like `<input>` or `<button>`) retain standard arrow key text cursor movement and focus handling.
+**Action:** Always scope container keyboard event listeners strictly to the container element itself and map arrow key movements to existing spring/physics target coordinates for smooth accessible positioning.
