@@ -1,0 +1,3 @@
+## 2026-10-31 - Canvas Reuse, Map LRU Caching, and Dimension Bypass in liquid-glass.js
+**Learning:** Frequent canvas element allocations in `makeMap` generate garbage collection pressure during continuous resize observer invocations. Furthermore, Canvas 2D rasterization and synchronous `.toDataURL()` serialization are CPU-bound bottlenecks when repeated with identical dimensions or across multiple instances with identical sizing.
+**Action:** Reuse a module-scoped HTML5 canvas context, memoize generated data URLs using a bounded Map-based LRU cache, and cache last-measured instance dimensions (`lastW`, `lastH`, `lastRadius`) to early-exit in `refresh()`.
