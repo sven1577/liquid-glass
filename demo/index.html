@@ -123,6 +123,15 @@
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
   }
+  .card-status {
+    margin-top: 8px; font-size: 13px; font-weight: 500;
+    color: #4ade80; text-align: center; min-height: 18px;
+  }
+  .hero .cta:focus-visible, .glass-card:focus-visible,
+  .card-form input:focus-visible, .card-form button:focus-visible,
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent); outline-offset: 3px;
+  }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
@@ -170,16 +179,17 @@
     <a class="cta" href="https://github.com/deepika-builds/liquid-glass">Get the file</a>
   </main>
 
-  <div class="glass-card" id="card" role="group" aria-label="Early access signup">
+  <div class="glass-card" id="card" role="region" tabindex="0" aria-label="Early access signup" aria-description="Use arrow keys to move card, Shift+arrow keys for larger steps">
     <div class="card-grip" aria-hidden="true"></div>
     <div class="card-head">
       <h2>Get early access</h2>
       <span class="card-badge">Beta</span>
     </div>
     <p class="card-sub">Be the first to build with Liquid Glass.</p>
-    <form class="card-form" onsubmit="return false">
-      <input type="email" name="email" placeholder="you@example.com" aria-label="Email address" autocomplete="email">
-      <button type="submit">Request invite</button>
+    <form class="card-form" id="signup-form">
+      <input type="email" name="email" id="signup-email" placeholder="you@example.com" aria-label="Email address" autocomplete="email" required>
+      <button type="submit" id="signup-btn">Request invite</button>
+      <div class="card-status" id="card-status" aria-live="polite"></div>
     </form>
     <div class="card-divider" aria-hidden="true"></div>
     <label class="card-switch">
@@ -212,6 +222,7 @@
         el.addEventListener("pointermove", (e) => this.onMove(e));
         el.addEventListener("pointerup", (e) => this.onUp(e));
         el.addEventListener("pointercancel", (e) => this.onUp(e));
+        el.addEventListener("keydown", (e) => this.onKeyDown(e));
         window.addEventListener("resize", () => this.onResize());
 
         this.clampTarget();
@@ -282,10 +293,35 @@
           `translate(${this.x}px, ${this.y}px) ` +
           `rotate(${angle}rad) scale(${1 + squash}, ${1 - squash}) rotate(${-angle}rad)`;
       }
+
+      onKeyDown(e) {
+        if (e.target !== this.el) return;
+        const step = e.shiftKey ? 40 : 15;
+        let handled = true;
+        if (e.key === "ArrowLeft") this.tx -= step;
+        else if (e.key === "ArrowRight") this.tx += step;
+        else if (e.key === "ArrowUp") this.ty -= step;
+        else if (e.key === "ArrowDown") this.ty += step;
+        else handled = false;
+        if (handled) { e.preventDefault(); this.clampTarget(); }
+      }
     }
 
     window.glassCard = new GlassCard(document.getElementById("card"));
     window.glassEffect = liquidGlass(document.getElementById("card"));
+
+    document.getElementById("signup-form").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const btn = document.getElementById("signup-btn");
+      const status = document.getElementById("card-status");
+      btn.disabled = true;
+      btn.textContent = "Invite requested!";
+      status.textContent = "You're on the list! Check your inbox soon.";
+      if (window.glassCard) window.glassCard.measure();
+      if (window.glassEffect && typeof window.glassEffect.refresh === "function") {
+        window.glassEffect.refresh();
+      }
+    });
   </script>
 </body>
 </html>
