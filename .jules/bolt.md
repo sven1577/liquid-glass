@@ -1,0 +1,3 @@
+## 2026-11-06 - Liquid Glass Canvas Allocation and Idle Animation Loops
+**Learning:** In liquid-glass, generating displacement maps repeatedly allocates new HTML5 Canvas DOM elements and triggers expensive canvas.toDataURL() conversions. Furthermore, continuous requestAnimationFrame loops in spring physics widgets keep CPU/GPU active even when stationary.
+**Action:** Reuse a shared offscreen canvas instance, cache generated data URIs in a bounded Map-based LRU cache, skip refresh when element dimensions have not changed, and pause requestAnimationFrame loops when velocity and residual displacement fall below a settlement threshold.
