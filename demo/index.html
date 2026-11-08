@@ -76,6 +76,10 @@
     will-change: transform;
   }
   .glass-card:active { cursor: grabbing; }
+  .glass-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
   /* cursor-tracked glare */
   .glass-card::after {
     content: ""; position: absolute; inset: 0; border-radius: inherit;
@@ -170,7 +174,7 @@
     <a class="cta" href="https://github.com/deepika-builds/liquid-glass">Get the file</a>
   </main>
 
-  <div class="glass-card" id="card" role="group" aria-label="Early access signup">
+  <div class="glass-card" id="card" role="region" aria-label="Early access signup (Use arrow keys to move)" tabindex="0">
     <div class="card-grip" aria-hidden="true"></div>
     <div class="card-head">
       <h2>Get early access</h2>
@@ -212,6 +216,7 @@
         el.addEventListener("pointermove", (e) => this.onMove(e));
         el.addEventListener("pointerup", (e) => this.onUp(e));
         el.addEventListener("pointercancel", (e) => this.onUp(e));
+        el.addEventListener("keydown", (e) => this.onKeyDown(e));
         window.addEventListener("resize", () => this.onResize());
 
         this.clampTarget();
@@ -250,6 +255,22 @@
         this.dragging = false;
         if (this.el.hasPointerCapture(e.pointerId)) {
           this.el.releasePointerCapture(e.pointerId);
+        }
+      }
+
+      onKeyDown(e) {
+        if (e.target !== this.el) return;
+        const step = e.shiftKey ? 80 : 20;
+        let handled = true;
+        if (e.key === "ArrowLeft") this.tx -= step;
+        else if (e.key === "ArrowRight") this.tx += step;
+        else if (e.key === "ArrowUp") this.ty -= step;
+        else if (e.key === "ArrowDown") this.ty += step;
+        else handled = false;
+
+        if (handled) {
+          e.preventDefault();
+          this.clampTarget();
         }
       }
 
