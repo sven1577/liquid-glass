@@ -76,6 +76,10 @@
     will-change: transform;
   }
   .glass-card:active { cursor: grabbing; }
+  .glass-card:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
+  }
   /* cursor-tracked glare */
   .glass-card::after {
     content: ""; position: absolute; inset: 0; border-radius: inherit;
@@ -123,6 +127,10 @@
     transform: scale(1.02);
     box-shadow: 0 6px 24px rgba(255, 255, 255, 0.22);
   }
+  .card-form button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .card-head {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
   }
@@ -158,6 +166,10 @@
   }
   .card-switch input:checked + .switch-track { background: rgba(255, 255, 255, 0.55); }
   .card-switch input:checked + .switch-track .switch-thumb { transform: translateX(18px); }
+  .card-switch input:focus-visible + .switch-track {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 </style>
 </head>
 <body>
@@ -170,7 +182,7 @@
     <a class="cta" href="https://github.com/deepika-builds/liquid-glass">Get the file</a>
   </main>
 
-  <div class="glass-card" id="card" role="group" aria-label="Early access signup">
+  <div class="glass-card" id="card" role="group" aria-label="Early access signup" tabindex="0" aria-description="Use arrow keys to move the card, hold Shift for larger steps">
     <div class="card-grip" aria-hidden="true"></div>
     <div class="card-head">
       <h2>Get early access</h2>
@@ -212,6 +224,7 @@
         el.addEventListener("pointermove", (e) => this.onMove(e));
         el.addEventListener("pointerup", (e) => this.onUp(e));
         el.addEventListener("pointercancel", (e) => this.onUp(e));
+        el.addEventListener("keydown", (e) => this.onKeyDown(e));
         window.addEventListener("resize", () => this.onResize());
 
         this.clampTarget();
@@ -251,6 +264,27 @@
         if (this.el.hasPointerCapture(e.pointerId)) {
           this.el.releasePointerCapture(e.pointerId);
         }
+      }
+
+      onKeyDown(e) {
+        if (e.target !== this.el) return;
+        const step = e.shiftKey ? 80 : 20;
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          this.ty -= step;
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          this.ty += step;
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          this.tx -= step;
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          this.tx += step;
+        } else {
+          return;
+        }
+        this.clampTarget();
       }
 
       onResize() {
